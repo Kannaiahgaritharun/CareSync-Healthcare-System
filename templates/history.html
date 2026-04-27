@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold text-dark">Activity History</h3>
+        <p class="text-muted">Track all your medicine and prescription actions.</p>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="mb-4">
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('history', filter='all') }}" class="btn btn-sm {{ 'btn-primary' if current_filter == 'all' else 'btn-outline-secondary' }} rounded-pill px-3">
+            <i class="bi bi-grid me-1"></i> All
+        </a>
+        <a href="{{ url_for('history', filter='medicines') }}" class="btn btn-sm {{ 'btn-primary' if current_filter == 'medicines' else 'btn-outline-secondary' }} rounded-pill px-3">
+            <i class="bi bi-capsule me-1"></i> Medicines
+        </a>
+        <a href="{{ url_for('history', filter='prescriptions') }}" class="btn btn-sm {{ 'btn-primary' if current_filter == 'prescriptions' else 'btn-outline-secondary' }} rounded-pill px-3">
+            <i class="bi bi-file-earmark-image me-1"></i> Prescriptions
+        </a>
+        <a href="{{ url_for('history', filter='deleted') }}" class="btn btn-sm {{ 'btn-danger' if current_filter == 'deleted' else 'btn-outline-secondary' }} rounded-pill px-3">
+            <i class="bi bi-trash me-1"></i> Deleted
+        </a>
+        <a href="{{ url_for('history', filter='removed') }}" class="btn btn-sm {{ 'btn-warning text-dark' if current_filter == 'removed' else 'btn-outline-secondary' }} rounded-pill px-3">
+            <i class="bi bi-x-circle me-1"></i> Removed
+        </a>
+    </div>
+</div>
+
+{% if logs %}
+<!-- Timeline -->
+<div class="position-relative" style="padding-left: 30px;">
+    <div class="position-absolute" style="left: 14px; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, #4361ee, #e0e7ff); border-radius: 4px;"></div>
+
+    {% for log in logs %}
+    <div class="d-flex mb-3 position-relative">
+        <!-- Timeline Dot -->
+        <div class="position-absolute d-flex align-items-center justify-content-center" style="left: -24px; top: 18px; width: 22px; height: 22px; border-radius: 50%; z-index: 2;
+            {% if log.action_type == 'deleted' %}
+                background: #dc3545;
+            {% elif log.action_type == 'removed' %}
+                background: #ffc107;
+            {% elif log.action_type == 'moved' %}
+                background: #0dcaf0;
+            {% elif log.action_type == 'restored' %}
+                background: #198754;
+            {% else %}
+                background: #4361ee;
+            {% endif %}
+        ">
+            {% if log.action_type == 'deleted' %}
+                <i class="bi bi-trash-fill text-white" style="font-size: 0.65rem;"></i>
+            {% elif log.action_type == 'removed' %}
+                <i class="bi bi-x-lg text-dark" style="font-size: 0.65rem;"></i>
+            {% elif log.action_type == 'moved' %}
+                <i class="bi bi-arrow-repeat text-white" style="font-size: 0.65rem;"></i>
+            {% elif log.action_type == 'restored' %}
+                <i class="bi bi-arrow-counterclockwise text-white" style="font-size: 0.65rem;"></i>
+            {% else %}
+                <i class="bi bi-circle-fill text-white" style="font-size: 0.5rem;"></i>
+            {% endif %}
+        </div>
+
+        <!-- Card -->
+        <div class="card border-0 shadow-sm w-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            {% if log.action_type == 'deleted' %}
+                                <span class="badge bg-danger rounded-pill px-2 py-1">🗑 Deleted</span>
+                            {% elif log.action_type == 'removed' %}
+                                <span class="badge bg-warning text-dark rounded-pill px-2 py-1">🗑 Removed</span>
+                            {% elif log.action_type == 'moved' %}
+                                <span class="badge bg-info text-dark rounded-pill px-2 py-1">🔁 Moved</span>
+                            {% elif log.action_type == 'restored' %}
+                                <span class="badge bg-success rounded-pill px-2 py-1">✅ Restored</span>
+                            {% else %}
+                                <span class="badge bg-secondary rounded-pill px-2 py-1">{{ log.action_type }}</span>
+                            {% endif %}
+
+                            {% if log.item_type == 'medicine' %}
+                                <span class="badge bg-light text-primary border rounded-pill px-2 py-1"><i class="bi bi-capsule me-1"></i>Medicine</span>
+                            {% elif log.item_type == 'prescription' %}
+                                <span class="badge bg-light text-info border rounded-pill px-2 py-1"><i class="bi bi-file-earmark-image me-1"></i>Prescription</span>
+                            {% endif %}
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1">{{ log.item_name }}</h6>
+                        {% if log.details %}
+                        <p class="text-muted small mb-1">{{ log.details }}</p>
+                        {% endif %}
+                        <p class="text-muted small mb-0"><i class="bi bi-clock me-1"></i>{{ log.timestamp }}</p>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0 ms-2">
+                        {% if log.action_type in ['removed', 'moved', 'deleted'] %}
+                        <form method="POST" action="{{ url_for('restore_history', id=log.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-2" title="Restore">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Delete Permanently" 
+                            onclick="confirmDeleteHistory({{ log.id }}, '{{ log.item_name }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 50vh;">
+    <div class="text-center p-5">
+        <div style="background: #e0e7ff; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+            <i class="bi bi-clock-history text-primary" style="font-size: 3rem;"></i>
+        </div>
+        <h4 class="fw-bold text-dark mb-2">No History Yet</h4>
+        <p class="text-muted mb-0">Actions you take on medicines and prescriptions will appear here.</p>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block modals %}
+<!-- Delete History Confirmation Modal -->
+<div class="modal fade" id="deleteHistoryModal" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Delete Permanently</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+          <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 3rem;"></i>
+          <p class="fw-bold mt-3 mb-1">Delete this history record permanently?</p>
+          <p class="text-muted small" id="deleteHistoryName"></p>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <form id="deleteHistoryForm" method="POST">
+              <button type="submit" class="btn btn-danger fw-bold"><i class="bi bi-trash me-1"></i> Yes, Delete</button>
+          </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDeleteHistory(logId, itemName) {
+    document.getElementById('deleteHistoryName').innerText = itemName;
+    document.getElementById('deleteHistoryForm').action = '/history/' + logId + '/delete';
+    var modal = new bootstrap.Modal(document.getElementById('deleteHistoryModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

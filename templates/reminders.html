@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold text-dark">Upcoming Reminders</h3>
+        <p class="text-muted">Stay on top of your schedule with your active medicine reminders.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Reminders List</h5>
+                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ medicines|length }} Active</span>
+                </div>
+                
+                {% if medicines %}
+                    <div class="list-group list-group-flush">
+                    {% for med in medicines %}
+                        <div class="list-group-item px-0 py-3 border-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 48px; height: 48px;">
+                                        <i class="bi bi-bell-fill fs-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark">{{ med.medicine_name }}</h6>
+                                        <p class="mb-0 text-muted small"><span class="badge bg-light text-dark border me-2">{{ med.dosage }}</span> {{ med.food_instruction or 'No specific instructions' }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <h5 class="fw-bold text-primary mb-1">{{ med.time }}</h5>
+                                    <small class="text-muted text-capitalize"><i class="bi bi-arrow-repeat me-1"></i>{{ med.repeat_type }}</small>
+                                </div>
+                            </div>
+                            <div class="mt-3 d-flex justify-content-end gap-2">
+                                <form method="POST" action="{{ url_for('log_medicine', id=med.id, status='taken') }}">
+                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm"><i class="bi bi-check2-circle me-1"></i> Mark Taken</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('snooze_medicine', id=med.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="bi bi-moon me-1"></i> Snooze 15m</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-calendar-check text-muted opacity-50 mb-3 d-block" style="font-size: 3rem;"></i>
+                        <h6 class="fw-bold text-muted">No active reminders</h6>
+                        <p class="text-muted small mb-0">You don't have any active medications scheduled.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm bg-primary text-white" style="border-radius: 15px;">
+            <div class="card-body p-4 text-center">
+                <i class="bi bi-shield-check fs-1 mb-3 d-block"></i>
+                <h5 class="fw-bold mb-2">Adherence Tip</h5>
+                <p class="small mb-0 opacity-75">Setting your reminders to match your daily routine (like meals or brushing teeth) increases the chance of taking your medication on time by 60%.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

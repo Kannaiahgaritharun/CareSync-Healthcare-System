@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="fw-bold text-dark">Health Reports & Analytics</h3>
+            <p class="text-muted mb-0">Track your medication adherence and view uploaded prescriptions.</p>
+        </div>
+        <button class="btn btn-outline-primary rounded-pill px-4 shadow-sm" onclick="window.print()">
+            <i class="bi bi-file-earmark-pdf me-2"></i>Export Report
+        </button>
+    </div>
+</div>
+
+<!-- Analytics Dashboard -->
+<div class="row g-4 mb-5">
+    <!-- Today's Stats -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 16px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">Today's Summary</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 rounded" style="background: rgba(25, 135, 84, 0.1);">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                        <h6 class="mb-0 fw-bold text-dark">Taken</h6>
+                    </div>
+                    <h4 class="mb-0 fw-bold text-success">{{ today_stats.taken }}</h4>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 rounded" style="background: rgba(220, 53, 69, 0.1);">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-x-circle-fill text-danger fs-4 me-3"></i>
+                        <h6 class="mb-0 fw-bold text-dark">Missed</h6>
+                    </div>
+                    <h4 class="mb-0 fw-bold text-danger">{{ today_stats.missed }}</h4>
+                </div>
+                <div class="d-flex justify-content-between align-items-center p-3 rounded" style="background: rgba(13, 110, 253, 0.1);">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-clock-fill text-primary fs-4 me-3"></i>
+                        <h6 class="mb-0 fw-bold text-dark">Pending</h6>
+                    </div>
+                    <h4 class="mb-0 fw-bold text-primary">{{ today_stats.pending }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weekly Adherence Chart -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 16px;">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0">7-Day Adherence</h5>
+                    <div class="d-flex align-items-center">
+                        <span class="badge {{ 'bg-success' if adherence_pct >= 80 else 'bg-warning' }} rounded-pill px-3 py-2 fs-6">
+                            {{ adherence_pct }}% Adherence
+                        </span>
+                    </div>
+                </div>
+                <div style="height: 250px;">
+                    <canvas id="adherenceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3 mt-4">
+    <div class="col-12">
+        <h4 class="fw-bold text-dark">Prescription Documents</h4>
+    </div>
+</div>
+
+{% if prescriptions %}
+<div class="row g-4">
+    {% for prescription in prescriptions %}
+    <div class="col-md-4 col-sm-6">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 16px; overflow: hidden;">
+            <div style="background: #f8f9fc; height: 220px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <a href="{{ url_for('static', filename='uploads/' + prescription.image_path) }}" target="_blank">
+                    <img 
+                        src="{{ url_for('static', filename='uploads/' + prescription.image_path) }}" 
+                        alt="Prescription Image"
+                        style="width: 100%; height: 220px; object-fit: cover; transition: transform 0.3s;"
+                        onmouseover="this.style.transform='scale(1.05)'"
+                        onmouseout="this.style.transform='scale(1)'"
+                    >
+                </a>
+            </div>
+            <div class="card-body p-3">
+                <h5 class="fw-bold mb-2 text-dark">
+                    <i class="bi bi-file-earmark-medical-fill text-primary me-2"></i>
+                    Prescription #{{ prescription.id }}
+                </h5>
+                {% if prescription.doctor_name %}
+                <p class="mb-1 text-dark fw-semibold"><i class="bi bi-person-badge text-muted me-2"></i>{{ prescription.doctor_name }}</p>
+                {% endif %}
+                {% if prescription.hospital_name %}
+                <p class="mb-1 text-dark"><i class="bi bi-building text-muted me-2"></i>{{ prescription.hospital_name }}</p>
+                {% endif %}
+                <p class="text-muted small mb-2">
+                    <i class="bi bi-calendar3 me-1"></i> {{ prescription.created_at }}
+                </p>
+                <div class="mb-3">
+                    <span class="badge bg-info text-dark"><i class="bi bi-capsule me-1"></i> {{ prescription.med_count }} Medicines Added</span>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('static', filename='uploads/' + prescription.image_path) }}" target="_blank" class="btn btn-sm btn-outline-primary flex-grow-1">
+                        <i class="bi bi-eye me-1"></i> View
+                    </a>
+                    <a href="{{ url_for('static', filename='uploads/' + prescription.image_path) }}" download class="btn btn-sm btn-outline-success flex-grow-1">
+                        <i class="bi bi-download me-1"></i> Download
+                    </a>
+                    <form method="POST" action="{{ url_for('delete_prescription', id=prescription.id) }}" class="flex-grow-1 m-0 p-0" onsubmit="return confirm('Are you sure you want to delete this prescription?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                            <i class="bi bi-trash me-1"></i> Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 50vh;">
+    <div class="text-center p-5">
+        <div style="background: #e0e7ff; width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+            <i class="bi bi-file-earmark-image text-primary" style="font-size: 3rem;"></i>
+        </div>
+        <h4 class="fw-bold text-dark mb-2">No Prescriptions Yet</h4>
+        <p class="text-muted mb-4">Upload a prescription image while adding a medicine to see it here.</p>
+        <a href="{{ url_for('add_medicine') }}" class="btn btn-primary rounded-pill px-4">
+            <i class="bi bi-plus-lg me-2"></i>Add Medicine with Prescription
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('adherenceChart').getContext('2d');
+    
+    // Data from backend
+    const labels = {{ weekly_stats.labels | tojson }};
+    const takenData = {{ weekly_stats.taken | tojson }};
+    const missedData = {{ weekly_stats.missed | tojson }};
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Taken',
+                    data: takenData,
+                    backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Missed',
+                    data: missedData,
+                    backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

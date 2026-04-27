@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
+                <div class="d-flex align-items-center">
+                    <a href="{{ request.referrer or url_for('my_medicines') }}" class="btn btn-light rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <h4 class="fw-bold text-dark mb-0">Edit Medicine</h4>
+                </div>
+            </div>
+            
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('edit_medicine', id=med.id) }}">
+                    <!-- Medicine Name -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark">Medicine Name</label>
+                        <div class="input-group input-group-lg shadow-sm" style="border-radius: 10px; overflow: hidden;">
+                            <span class="input-group-text bg-white border-end-0 text-primary"><i class="bi bi-capsule"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" name="medicine_name" value="{{ med.medicine_name }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-4 mb-4">
+                        <!-- Dosage -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">Dosage</label>
+                            <div class="input-group input-group-lg shadow-sm" style="border-radius: 10px; overflow: hidden;">
+                                <span class="input-group-text bg-white border-end-0 text-primary"><i class="bi bi-prescription2"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" name="dosage" value="{{ med.dosage }}" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Time -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">Time</label>
+                            <div class="input-group input-group-lg shadow-sm" style="border-radius: 10px; overflow: hidden;">
+                                <span class="input-group-text bg-white border-end-0 text-primary"><i class="bi bi-clock"></i></span>
+                                <input type="time" class="form-control border-start-0 ps-0" name="time" value="{{ med.time }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Repeat Type -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark">Repeat Frequency</label>
+                        <div class="d-flex gap-3">
+                            <input type="radio" class="btn-check" name="repeat_type" id="daily" value="daily" required {% if med.repeat_type and med.repeat_type|lower == 'daily' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary rounded-pill px-4" for="daily">Daily</label>
+                            
+                            <input type="radio" class="btn-check" name="repeat_type" id="weekly" value="weekly" required {% if med.repeat_type and med.repeat_type|lower == 'weekly' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary rounded-pill px-4" for="weekly">Weekly</label>
+                            
+                            <input type="radio" class="btn-check" name="repeat_type" id="once" value="once" required {% if med.repeat_type and med.repeat_type|lower == 'once' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary rounded-pill px-4" for="once">Once</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Food Instruction -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark">Food Instruction</label>
+                        <select class="form-select form-select-lg shadow-sm" name="food_instruction" style="border-radius: 10px;">
+                            <option value="Before Food" {% if med.food_instruction == 'Before Food' %}selected{% endif %}>Before Food</option>
+                            <option value="After Food" {% if med.food_instruction == 'After Food' %}selected{% endif %}>After Food</option>
+                            <option value="With Food" {% if med.food_instruction == 'With Food' %}selected{% endif %}>With Food</option>
+                            <option value="Doesn't matter" {% if med.food_instruction == 'Doesn\'t matter' %}selected{% endif %}>Doesn't matter</option>
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid mt-5">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill shadow-sm fw-bold">
+                            <i class="bi bi-check2-circle me-2"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

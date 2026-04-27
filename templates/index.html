@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CareSync - Medicine Reminder System</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="landing-page">
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg landing-nav">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <div class="logo-icon-container text-primary me-2">
+                    <i class="bi bi-heart-pulse-fill fs-3"></i>
+                </div>
+                <div>
+                    <h1 class="logo-text mb-0 fs-3 fw-bold text-primary">Care<span class="text-success">Sync</span></h1>
+                    <small class="text-muted d-block logo-subtext" style="font-size: 0.75rem; letter-spacing: 0.5px;">Medicine Reminder System</small>
+                </div>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mx-auto nav-links-center">
+                    <li class="nav-item"><a class="nav-link active" href="#home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">About</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">How It Works</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+                </ul>
+                <div class="nav-buttons">
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-login me-2 px-4 rounded-pill fw-medium d-inline-flex align-items-center gap-2"><i class="bi bi-box-arrow-in-right"></i> Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-register px-4 rounded-pill fw-medium shadow-sm d-inline-flex align-items-center gap-2"><i class="bi bi-person-plus"></i> Register</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero-section position-relative overflow-hidden">
+        <div class="hero-bg-accent"></div>
+        <div class="container position-relative z-1 h-100">
+            <div class="row h-100 align-items-center pb-5">
+                <div class="col-lg-6 hero-text-col pt-5">
+                    <h1 class="hero-title display-4 fw-bold text-dark mb-3" style="line-height: 1.2;">
+                        Never Miss a Dose,<br>
+                        We <span class="text-success">Care</span> for Your Loved Ones
+                    </h1>
+                    <p class="hero-subtitle text-secondary fs-5 mb-4 pe-md-5">
+                        CareSync helps elderly and patients take medicines
+                        on time with smart reminders and family support.
+                    </p>
+                    <div class="hero-buttons mt-4 d-flex gap-3">
+                        {% if 'user_id' in session %}
+                        <a href="{{ url_for('patient_dashboard') if session.get('role') == 'patient' else url_for('family_dashboard') }}" class="btn btn-primary btn-lg px-5 rounded-pill shadow-sm d-inline-flex align-items-center gap-2 fw-medium"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                        {% else %}
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-5 rounded-pill shadow-sm d-inline-flex align-items-center gap-2 fw-medium"><i class="bi bi-person-plus"></i> Get Started</a>
+                        {% endif %}
+                        <a href="#features" class="btn btn-outline-primary bg-white btn-lg px-5 rounded-pill d-inline-flex align-items-center gap-2 fw-medium"><i class="bi bi-info-circle"></i> Learn More</a>
+                    </div>
+                </div>
+                <div class="col-lg-6 position-relative hero-image-col pt-4">
+                    <img src="{{ url_for('static', filename='hero_image.png') }}" alt="Elderly man and caregiver" class="hero-image img-fluid w-100 object-fit-cover" style="max-height: 500px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1)); border-radius: 20px 20px 0 0; mask-image: linear-gradient(to bottom, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);">
+                </div>
+            </div>
+        </div>
+        <!-- Wave shape divider -->
+        <div class="wave-divider position-absolute bottom-0 w-100" style="height: auto; z-index: 2;">
+            <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" style="width: calc(100% + 1.3px); height: 120px; display: block; transform: rotate(180deg);">
+                <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C50.25,97.77,100,91.07,149.27,78.29,206.18,63.5,264,66.86,321.39,56.44Z" class="shape-fill" fill="#ffffff"></path>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section py-5 bg-white position-relative z-3">
+        <div class="container pt-3">
+            <div class="text-center mb-5 position-relative">
+                <h2 class="section-title fw-bold text-dark d-inline-block position-relative pb-2">Our Features</h2>
+                <div class="title-underline mx-auto mt-2 rounded" style="width: 50px; height: 3px; background-color: #0d6efd;"></div>
+                <div class="title-dot rounded-circle bg-primary mx-auto mt-1" style="width: 4px; height: 4px;"></div>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-3">
+                    <a href="{{ url_for('reminders') if 'user_id' in session else url_for('login') }}" class="text-decoration-none">
+                        <div class="feature-card text-center p-4 h-100 bg-white border border-light rounded-4 shadow-sm hover-lift transition-all">
+                            <div class="feature-icon-wrapper rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; background-color: rgba(13, 110, 253, 0.1); color: #0d6efd;">
+                                <i class="bi bi-bell-fill fs-4"></i>
+                            </div>
+                            <h4 class="fw-bold fs-5 mb-2 text-dark">Pill Reminders</h4>
+                            <p class="text-secondary small mb-0">Timely alerts for medicines so you never miss a dose.</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('family_dashboard') if session.get('role') == 'family' else (url_for('patient_dashboard') if 'user_id' in session else url_for('login')) }}" class="text-decoration-none">
+                        <div class="feature-card text-center p-4 h-100 bg-white border border-light rounded-4 shadow-sm hover-lift transition-all">
+                            <div class="feature-icon-wrapper rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; background-color: rgba(25, 135, 84, 0.1); color: #198754;">
+                                <i class="bi bi-bar-chart-fill fs-4" style="transform: rotate(90deg) scaleX(-1);"></i>
+                            </div>
+                            <h4 class="fw-bold fs-5 mb-2 text-dark">Family Dashboard</h4>
+                            <p class="text-secondary small mb-0">Family can track medicine intake and health reports.</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('reports') if 'user_id' in session else url_for('login') }}" class="text-decoration-none">
+                        <div class="feature-card text-center p-4 h-100 bg-white border border-light rounded-4 shadow-sm hover-lift transition-all">
+                            <div class="feature-icon-wrapper rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; background-color: rgba(253, 126, 20, 0.1); color: #fd7e14;">
+                                <i class="bi bi-file-earmark-text-fill fs-4"></i>
+                            </div>
+                            <h4 class="fw-bold fs-5 mb-2 text-dark">Reports & History</h4>
+                            <p class="text-secondary small mb-0">Detailed reports and history to monitor progress.</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('emergency_dashboard') if 'user_id' in session else url_for('login') }}" class="text-decoration-none">
+                        <div class="feature-card text-center p-4 h-100 bg-white border border-light rounded-4 shadow-sm hover-lift transition-all">
+                            <div class="feature-icon-wrapper rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">
+                                <span class="sos-text fw-bold" style="font-size: 1.1rem; letter-spacing: 0.5px;">SOS</span>
+                            </div>
+                            <h4 class="fw-bold fs-5 mb-2 text-dark">Emergency Alerts</h4>
+                            <p class="text-secondary small mb-0">Instant alerts to family during emergencies.</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Banner -->
+    <div id="contact" class="safety-banner py-4 mt-5" style="background-color: #f8f9fa;">
+        <div class="container text-center">
+            <div class="d-inline-flex align-items-center justify-content-center px-4 py-2 rounded-pill bg-white border shadow-sm" style="border-color: rgba(13, 110, 253, 0.1) !important;">
+                <i class="bi bi-shield-fill-check text-primary fs-5 me-2"></i>
+                <span class="text-primary fw-medium">Your loved ones' health and safety is our priority.</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

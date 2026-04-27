@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold text-dark">Family Dashboard</h3>
+        {% if patient %}
+        <p class="text-muted">Monitoring health adherence for: <strong class="text-dark">{{ patient.name }}</strong></p>
+        {% endif %}
+    </div>
+</div>
+
+{% if patient %}
+<div class="row g-4">
+    <!-- Today's Adherence -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 15px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">Today's Overview ({{ today }})</h5>
+                
+                <div class="row g-3 text-center">
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded-3">
+                            <p class="mb-0 text-muted small">Taken</p>
+                            <h4 class="mb-0 fw-bold text-success">{{ logs|selectattr("status", "equalto", "taken")|list|length }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 bg-light rounded-3">
+                            <p class="mb-0 text-muted small">Missed</p>
+                            <h4 class="mb-0 fw-bold text-danger">{{ logs|selectattr("status", "equalto", "missed")|list|length }}</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive mt-4">
+                    <table class="table align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Medicine</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if logs %}
+                                {% for log in logs %}
+                                <tr>
+                                    <td class="fw-bold">{{ log.time }}</td>
+                                    <td>{{ log.medicine_name }}</td>
+                                    <td>
+                                        {% if log.status == 'taken' %}
+                                            <span class="badge badge-soft-success rounded-pill px-3 py-2">Taken</span>
+                                        {% else %}
+                                            <span class="badge badge-soft-danger rounded-pill px-3 py-2">Missed</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-4 text-muted">No logs recorded for today yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">Prescribed Medicines</h5>
+                <div class="list-group list-group-flush">
+                    {% for med in medicines %}
+                    <div class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon icon-blue me-3" style="width: 40px; height: 40px; font-size: 1.2rem;">
+                                <i class="bi bi-capsule"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark">
+                                    {{ med.medicine_name }}
+                                    {% if med.prescription_image %}
+                                    <a href="{{ url_for('static', filename='uploads/' + med.prescription_image) }}" target="_blank" class="ms-1 text-primary" title="View Prescription">
+                                        <i class="bi bi-file-image"></i>
+                                    </a>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">{{ med.dosage }} | {{ med.repeat_type }}</small>
+                            </div>
+                        </div>
+                        <span class="badge bg-light text-primary border rounded-pill px-3 py-2 fw-bold">{{ med.time }}</span>
+                    </div>
+                    {% else %}
+                    <p class="text-muted py-3">No medicines prescribed.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts and SOS -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm bg-white" style="border-radius: 15px;">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4 d-flex align-items-center">
+                    <i class="bi bi-bell-fill text-danger me-2"></i> Recent Alerts
+                </h5>
+                <div style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+                    {% if alerts %}
+                        {% for alert in alerts %}
+                        <div class="alert {% if alert.type == 'SOS Emergency' %}alert-danger pulse-bg{% else %}bg-light border-0{% endif %} p-3 mb-3" style="border-radius: 12px;">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <span class="badge {% if alert.type == 'SOS Emergency' %}bg-danger{% else %}bg-warning text-dark{% endif %} rounded-pill px-2">
+                                    {{ alert.type }}
+                                </span>
+                                <small class="text-muted">{{ alert.created_at }}</small>
+                            </div>
+                            <p class="mb-0 text-dark fw-semibold mt-2">{{ alert.message }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-shield-check text-success display-4 mb-3"></i>
+                            <p class="text-muted">No recent alerts. Everything is normal.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm p-5 text-center" style="border-radius: 15px;">
+    <i class="bi bi-person-x text-muted display-1 mb-4"></i>
+    <h3>No Patient Linked</h3>
+    <p class="text-muted">Please ensure you are linked to a patient account to see their health data.</p>
+</div>
+{% endif %}
+
+<style>
+    .pulse-bg {
+        animation: bgPulse 2s infinite;
+        border: 2px solid #ff0844;
+    }
+    @keyframes bgPulse {
+        0% { background-color: #fff5f5; }
+        50% { background-color: #fee2e2; }
+        100% { background-color: #fff5f5; }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <h3 class="fw-bold text-dark">My Medicines</h3>
+        <a href="{{ url_for('add_medicine') }}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+            <i class="bi bi-plus-lg me-1"></i> Add Medicine
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="border-0 px-4 py-3 text-muted text-uppercase" style="font-size: 0.85rem; border-top-left-radius: 15px;">Medicine Name</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Dosage</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Time</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Repeat</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Status</th>
+                                <th class="border-0 py-3 px-4 text-muted text-uppercase text-end" style="font-size: 0.85rem; border-top-right-radius: 15px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if medicines %}
+                                {% for med in medicines %}
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-capsule-pill fs-5"></i>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0 fw-bold">{{ med.medicine_name }}</h6>
+                                                {% if med.food_instruction %}
+                                                    <small class="text-muted">{{ med.food_instruction }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3">{{ med.dosage }}</td>
+                                    <td class="py-3 fw-bold text-dark"><i class="bi bi-clock me-1 text-muted"></i>{{ med.time }}</td>
+                                    <td class="py-3 text-capitalize">{{ med.repeat_type }}</td>
+                                    <td class="py-3">
+                                        {% if med.status == 'active' %}
+                                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2">Active</span>
+                                        {% elif med.status == 'archived' %}
+                                            <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-2">Archived</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-2">{{ med.status|capitalize }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-end">
+                                        <a href="{{ url_for('edit_medicine', id=med.id) }}" class="btn btn-sm btn-light text-primary me-2 rounded-circle" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" title="Edit">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_medicine', id=med.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this medicine completely?');">
+                                            <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" title="Delete">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <i class="bi bi-capsule text-muted opacity-50 mb-3 d-block" style="font-size: 3rem;"></i>
+                                        <h5 class="fw-bold text-muted">No medicines added yet</h5>
+                                        <p class="text-muted small mb-4">Click the button above to add your first medication.</p>
+                                        <a href="{{ url_for('add_medicine') }}" class="btn btn-outline-primary rounded-pill px-4">Add Medicine</a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

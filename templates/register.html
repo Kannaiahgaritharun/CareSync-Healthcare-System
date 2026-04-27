@@ -1,0 +1,52 @@
+{% extends "auth_base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<div class="card auth-card p-4">
+    <h3 class="text-center dashboard-title mb-4">Create Account</h3>
+            <form method="POST" action="{{ url_for('register') }}">
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" class="form-control" required placeholder="Enter your full name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email address</label>
+                    <input type="email" name="email" class="form-control" required placeholder="Enter your email">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control" required placeholder="Create a password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Role</label>
+                    <select name="role" class="form-select" id="roleSelect" required onchange="togglePatientEmail()">
+                        <option value="patient">Patient / User</option>
+                        <option value="family">Family Member</option>
+                    </select>
+                </div>
+                <div class="mb-4" id="patientEmailDiv" style="display: none;">
+                    <label class="form-label">Patient's Email (To link account)</label>
+                    <input type="email" name="patient_email" id="patientEmailInput" class="form-control" placeholder="Enter patient's registered email">
+                    <small class="text-muted">The patient must register first before you can link as a family member.</small>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Register</button>
+            </form>
+            <div class="text-center mt-3">
+                <p>Already have an account? <a href="{{ url_for('login') }}" class="text-decoration-none">Login</a></p>
+            </div>
+</div><script>
+function togglePatientEmail() {
+    var role = document.getElementById("roleSelect").value;
+    var patientDiv = document.getElementById("patientEmailDiv");
+    var patientInput = document.getElementById("patientEmailInput");
+    if (role === "family") {
+        patientDiv.style.display = "block";
+        patientInput.required = true;
+    } else {
+        patientDiv.style.display = "none";
+        patientInput.required = false;
+    }
+}
+</script>
+{% endblock %}

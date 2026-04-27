@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    {% if prescription %}
+    <!-- Prescription Image Side -->
+    <div class="col-md-6 mb-4">
+        <div class="card p-3 h-100 shadow-sm border-info" style="background: #f0faff;">
+            <h4 class="fw-bold mb-3"><i class="bi bi-file-earmark-medical-fill text-info me-2"></i>Reference Prescription</h4>
+            <div class="text-center bg-white rounded border" style="height: 500px; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 10px;">
+                <img src="{{ url_for('static', filename='uploads/' + prescription.image_path) }}" class="img-fluid" style="max-width: 100%;">
+            </div>
+            <p class="text-muted small mt-2">Use this image to copy the tablet details accurately.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Form Side -->
+    <div class="col-md-{{ '6' if prescription else '8 mx-auto' }} mb-4">
+        <div class="card p-4 h-100 shadow-sm">
+            <h3 class="dashboard-title mb-4">{% if prescription %}Step 2: Add Tablet details{% else %}Add Medicine Details{% endif %}</h3>
+            <form method="POST" action="{{ url_for('add_medicine_details') }}">
+                {% if prescription_id %}
+                <input type="hidden" name="prescription_id" value="{{ prescription_id }}">
+                {% endif %}
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Tablet / Medicine Name</label>
+                        <input type="text" name="medicine_name" class="form-control" required placeholder="e.g., Paracetamol">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Dose (mg)</label>
+                        <input type="text" name="dosage" class="form-control" required placeholder="e.g., 500mg">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Time</label>
+                        <input type="time" name="time" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Frequency</label>
+                        <select name="repeat_type" class="form-select" required>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="As Needed">As Needed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold d-block">Food Instructions</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="food_instruction" id="beforeFood" value="Before Food" required>
+                        <label class="btn btn-outline-primary" for="beforeFood">Before Food</label>
+
+                        <input type="radio" class="btn-check" name="food_instruction" id="afterFood" value="After Food" required>
+                        <label class="btn btn-outline-primary" for="afterFood">After Food</label>
+                        
+                        <input type="radio" class="btn-check" name="food_instruction" id="anytimeFood" value="Anytime" required>
+                        <label class="btn btn-outline-primary" for="anytimeFood">Any Time</label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Start Date</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">End Date / Deadline <small class="text-muted">(Optional)</small></label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Notes</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="e.g., Take with a full glass of water"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('patient_dashboard') }}" class="btn btn-light fw-bold"><i class="bi bi-arrow-left"></i> Back</a>
+                    <div>
+                        <button type="submit" name="action" value="add_another" class="btn btn-outline-primary fw-bold me-2">Save & Add Another</button>
+                        <button type="submit" name="action" value="finish" class="btn btn-primary fw-bold"><i class="bi bi-check2-circle"></i> Save Medicine</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

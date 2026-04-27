@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Hero Greeting -->
+<div class="row mb-4 align-items-center">
+    <div class="col-lg-7">
+        <p class="mb-0 text-muted" style="font-size:0.85rem;">Good Afternoon,</p>
+        <h3 class="fw-bold text-primary mb-1">{{ session.get('name') }} 👋</h3>
+        <p class="text-muted mb-0" style="font-size:0.88rem;">💙 Stay healthy and take care of yourself!</p>
+    </div>
+    <div class="col-lg-5 d-none d-lg-flex justify-content-end">
+        <div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:20px;padding:20px 30px;display:flex;align-items:center;gap:16px;border:1px solid #c7d7fd;">
+            <div style="background:linear-gradient(135deg,#4e73df,#2d5fc4);border-radius:50%;width:64px;height:64px;display:flex;align-items:center;justify-content:center;">
+                <i class="bi bi-person-fill text-white" style="font-size:2rem;"></i>
+            </div>
+            <div>
+                <div class="fw-bold text-primary">Your Health Dashboard</div>
+                <small class="text-muted">Stay on top of your medications</small>
+            </div>
+            <div style="font-size:2.5rem;">🏥</div>
+        </div>
+    </div>
+</div>
+
+<!-- 4 Stat Cards -->
+<div class="row mb-4 g-3">
+    <div class="col-6 col-md-3">
+        <div class="stat-card flex-column align-items-start rounded-4 border border-light shadow-sm hover-lift transition-all" style="position:relative;overflow:hidden;">
+            <div class="d-flex align-items-center w-100 mb-1">
+                <div class="stat-icon icon-blue mb-0 me-3"><i class="bi bi-capsule"></i></div>
+                <div>
+                    <p class="stat-value mb-0">{{ medicines|length }}</p>
+                    <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Today Medicines</p>
+                </div>
+            </div>
+            <p class="text-muted mb-3 ms-1" style="font-size:0.75rem;">Scheduled for today</p>
+            <div class="w-100 border-top pt-2 text-center">
+                <a href="{{ url_for('my_medicines') }}" class="text-primary fw-bold text-decoration-none" style="font-size:0.8rem;">View Schedule →</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card flex-column align-items-start rounded-4 border border-light shadow-sm hover-lift transition-all">
+            <div class="d-flex align-items-center w-100 mb-1">
+                <div class="stat-icon icon-green mb-0 me-3"><i class="bi bi-check2-circle"></i></div>
+                <div>
+                    <p class="stat-value mb-0">{{ log_dict.values()|select("equalto","taken")|list|length }}</p>
+                    <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Taken</p>
+                </div>
+            </div>
+            <p class="text-muted mb-3 ms-1" style="font-size:0.75rem;">Completed</p>
+            <div class="w-100 border-top pt-2 text-center">
+                <a href="{{ url_for('history') }}" class="text-success fw-bold text-decoration-none" style="font-size:0.8rem;">View Details →</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card flex-column align-items-start rounded-4 border border-light shadow-sm hover-lift transition-all">
+            <div class="d-flex align-items-center w-100 mb-1">
+                <div class="stat-icon icon-orange mb-0 me-3"><i class="bi bi-clock"></i></div>
+                <div>
+                    <p class="stat-value mb-0">{{ pending_count }}</p>
+                    <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Pending</p>
+                </div>
+            </div>
+            <p class="text-muted mb-3 ms-1" style="font-size:0.75rem;">Yet to take</p>
+            <div class="w-100 border-top pt-2 text-center">
+                <a href="{{ url_for('reminders') }}" class="text-warning fw-bold text-decoration-none" style="font-size:0.8rem;">View Details →</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card flex-column align-items-start rounded-4 border border-light shadow-sm hover-lift transition-all" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#missedModal">
+            <div class="d-flex align-items-center w-100 mb-1">
+                <div class="stat-icon icon-red mb-0 me-3"><i class="bi bi-x-circle"></i></div>
+                <div>
+                    <p class="stat-value mb-0">{{ log_dict.values()|select("equalto","missed")|list|length }}</p>
+                    <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Missed</p>
+                </div>
+            </div>
+            <p class="text-muted mb-3 ms-1" style="font-size:0.75rem;">Not taken</p>
+            <div class="w-100 border-top pt-2 text-center">
+                <span class="text-danger fw-bold" style="font-size:0.8rem;">View Details →</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left: Quick Actions -->
+    <div class="col-lg-8">
+        <h6 class="fw-bold mb-3 text-dark">Quick Actions</h6>
+        <div class="row row-cols-2 row-cols-md-4 g-3 mb-3">
+            <div class="col">
+                <a href="{{ url_for('add_medicine') }}" class="quick-access-card bg-pastel-blue">
+                    <div style="width:44px;height:44px;background:#4e73df;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-plus-lg text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Add New Medicine</div>
+                    <div class="qa-desc">Add a new medicine to your list</div>
+                    <div class="qa-btn text-pastel-blue"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{{ url_for('my_medicines') }}" class="quick-access-card bg-pastel-green">
+                    <div style="width:44px;height:44px;background:#059669;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-file-earmark-medical text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Upload Prescription</div>
+                    <div class="qa-desc">Upload and store your prescription</div>
+                    <div class="qa-btn text-pastel-green"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{{ url_for('reminders') }}" class="quick-access-card bg-pastel-purple">
+                    <div style="width:44px;height:44px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-calendar-check text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Today's Schedule</div>
+                    <div class="qa-desc">View today's medicine schedule</div>
+                    <div class="qa-btn text-pastel-purple"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{{ url_for('my_medicines') }}" class="quick-access-card bg-pastel-teal">
+                    <div style="width:44px;height:44px;background:#0d9488;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-check2-square text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Mark Medicine Taken</div>
+                    <div class="qa-desc">Mark medicine as taken</div>
+                    <div class="qa-btn text-pastel-teal"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+        </div>
+        <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+            <div class="col">
+                <a href="{{ url_for('reports') }}" class="quick-access-card bg-pastel-orange">
+                    <div style="width:44px;height:44px;background:#ea580c;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-download text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Download Report</div>
+                    <div class="qa-desc">Download your health report</div>
+                    <div class="qa-btn text-pastel-orange"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="#contacts" class="quick-access-card bg-pastel-blue">
+                    <div style="width:44px;height:44px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-telephone-fill text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Call Family Contact</div>
+                    <div class="qa-desc">Quick call to your family contact</div>
+                    <div class="qa-btn text-pastel-blue"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{{ url_for('emergency_dashboard') }}" class="quick-access-card bg-pastel-red">
+                    <div style="width:44px;height:44px;background:#dc2626;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <span class="text-white fw-bold" style="font-size:0.75rem;letter-spacing:0.5px;">SOS</span>
+                    </div>
+                    <div class="qa-title">SOS Help Now</div>
+                    <div class="qa-desc">Get immediate emergency help</div>
+                    <div class="qa-btn text-pastel-red"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{{ url_for('reminders') }}" class="quick-access-card bg-pastel-teal">
+                    <div style="width:44px;height:44px;background:#0891b2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+                        <i class="bi bi-droplet-fill text-white fs-5"></i>
+                    </div>
+                    <div class="qa-title">Water Reminder</div>
+                    <div class="qa-desc">Stay hydrated and healthy</div>
+                    <div class="qa-btn text-pastel-teal"><i class="bi bi-arrow-right"></i></div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Stay Healthy Banner -->
+        <div class="rounded-4 p-4 d-flex align-items-center justify-content-between" style="background:linear-gradient(135deg,#eef2ff 0%,#dbeafe 100%);border:1px solid #c7d7fd;">
+            <div>
+                <h5 class="fw-bold text-primary mb-1">Stay Healthy 💙</h5>
+                <p class="text-muted mb-0" style="font-size:0.85rem;">Take your medicines on time and<br>track your wellness every day.</p>
+            </div>
+            <div class="d-flex gap-2 align-items-center" style="font-size:2.5rem;">
+                <span>⏰</span><span>💊</span><span>🌿</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-lg-4">
+        <!-- Today's Schedule -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold mb-0">Today's Schedule</h6>
+            <a href="{{ url_for('my_medicines') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:0.73rem;">View All</a>
+        </div>
+        <div class="card border-light shadow-sm rounded-4 mb-3 overflow-hidden">
+            {% if medicines %}
+            <ul class="list-group list-group-flush">
+                {% for med in medicines %}
+                {% set status = log_dict.get(med.id) %}
+                <li class="list-group-item px-3 py-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="text-center rounded-2 px-2 py-1" style="background:#eef2ff;min-width:52px;">
+                                <span class="fw-bold text-primary d-block" style="font-size:0.8rem;">{{ med.time }}</span>
+                            </div>
+                            <div>
+                                <div class="fw-semibold text-dark" style="font-size:0.85rem;">{{ med.medicine_name }}</div>
+                                <div class="text-muted" style="font-size:0.73rem;">{{ med.dosage }}</div>
+                            </div>
+                        </div>
+                        {% if status == 'taken' %}
+                        <span class="badge badge-soft-success rounded-pill px-2 py-1" style="font-size:0.7rem;"><i class="bi bi-check-circle me-1"></i>Taken</span>
+                        {% elif status == 'missed' %}
+                        <span class="badge badge-soft-danger rounded-pill px-2 py-1" style="font-size:0.7rem;"><i class="bi bi-x-circle me-1"></i>Missed</span>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('log_medicine', id=med.id, status='taken') }}" class="m-0">
+                            <button type="submit" class="badge badge-soft-warning rounded-pill border-0 px-2 py-1" style="font-size:0.7rem;cursor:pointer;">⏳ Pending</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="p-3 text-center text-muted" style="font-size:0.85rem;">No medicines scheduled today.</div>
+            {% endif %}
+        </div>
+
+        <!-- Next Reminder -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold mb-0">Next Reminder</h6>
+            <a href="{{ url_for('reminders') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:0.73rem;">View All</a>
+        </div>
+        <div class="card border-light shadow-sm rounded-4 mb-3 p-3">
+            {% set next_med = medicines|selectattr('id','ne',None)|list|first if medicines else None %}
+            {% if next_med %}
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:64px;height:64px;border-radius:50%;border:3px solid #4e73df22;background:#eef2ff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <i class="bi bi-clock-fill text-primary" style="font-size:1.5rem;"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark" style="font-size:0.9rem;">{{ next_med.medicine_name }}</div>
+                    <div class="text-muted" style="font-size:0.78rem;">{{ next_med.dosage }}</div>
+                    <div class="text-primary fw-semibold" style="font-size:0.78rem;">Today, {{ next_med.time }}</div>
+                </div>
+                <div style="background:#eef2ff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-bell-fill text-primary" style="font-size:0.9rem;"></i>
+                </div>
+            </div>
+            {% else %}
+            <div class="d-flex align-items-center gap-3">
+                <div style="background:#eef2ff;border-radius:50%;width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-bell-fill text-primary fs-5"></i>
+                </div>
+                <div>
+                    <div class="fw-bold text-primary" style="font-size:0.85rem;">No upcoming reminders</div>
+                    <div class="text-muted" style="font-size:0.75rem;">You're all set for today!</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Emergency Contact -->
+        <div class="d-flex justify-content-between align-items-center mb-2" id="contacts">
+            <h6 class="fw-bold mb-0">Emergency Contact</h6>
+            <button class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:0.73rem;" data-bs-toggle="modal" data-bs-target="#addContactModal">Add New</button>
+        </div>
+        <div class="card border-light shadow-sm rounded-4 p-3">
+            {% if contacts %}
+            {% for contact in contacts %}
+            <div class="d-flex align-items-center justify-content-between {% if not loop.last %}mb-3 pb-3 border-bottom{% endif %}">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="background:linear-gradient(135deg,#4e73df,#2d5fc4);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                        <i class="bi bi-person-fill text-white" style="font-size:0.9rem;"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark" style="font-size:0.85rem;">{{ contact.name }}</div>
+                        <div class="text-muted" style="font-size:0.73rem;">{{ contact.relation }} • {{ contact.phone_number }}</div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="tel:{{ contact.phone_number }}" class="btn btn-success btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:30px;height:30px;">
+                        <i class="bi bi-telephone-fill" style="font-size:0.7rem;"></i>
+                    </a>
+                    <a href="sms:{{ contact.phone_number }}" class="btn btn-primary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:30px;height:30px;">
+                        <i class="bi bi-chat-dots-fill" style="font-size:0.7rem;"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="text-center py-2">
+                <p class="text-muted mb-0" style="font-size:0.83rem;">No contacts added yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Remove Tablet Modal -->
+<div class="modal fade" id="removeTabletModal" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-trash me-2"></i>Remove Tablet</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+          <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:3rem;"></i>
+          <p class="fw-bold mt-3 mb-1">Remove this tablet?</p>
+          <p class="text-muted small" id="removeTabletName"></p>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <form id="removeTabletForm" method="POST">
+              <button type="submit" class="btn btn-danger fw-bold"><i class="bi bi-trash me-1"></i>Yes, Remove</button>
+          </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Missed Modal -->
+<div class="modal fade" id="missedModal" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon-fill me-2"></i>Missed Medications</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        {% if missed_details %}
+        <ul class="list-group list-group-flush">
+            {% for md in missed_details %}
+            <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <h6 class="fw-bold mb-1">{{ md.medicine_name }}</h6>
+                    <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ md.date }} <i class="bi bi-clock ms-2 me-1"></i>{{ md.time }}</small>
+                </div>
+                <span class="badge bg-danger rounded-pill px-3 py-2">Missed</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-emoji-smile text-success" style="font-size:4rem;"></i>
+            <h5 class="mt-3 fw-bold">Perfect Record!</h5>
+            <p class="text-muted">No missed medications.</p>
+        </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div class="modal fade" id="addContactModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold">Add Emergency Contact</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('add_contact') }}">
+          <div class="modal-body">
+              <div class="mb-3"><label class="form-label fw-bold">Name</label><input type="text" class="form-control" name="name" required></div>
+              <div class="mb-3">
+                  <label class="form-label fw-bold">Relation</label>
+                  <select class="form-select" name="relation" required>
+                      <option value="">Select Relation</option>
+                      {% for r in ['Father','Mother','Wife','Husband','Son','Daughter','Brother','Sister','Friend','Caretaker','Other'] %}
+                      <option value="{{ r }}">{{ r }}</option>
+                      {% endfor %}
+                  </select>
+              </div>
+              <div class="mb-3"><label class="form-label fw-bold">Phone Number</label><input type="tel" class="form-control" name="phone_number" required></div>
+              <div class="mb-3"><label class="form-label fw-bold">Alternate Number <small class="text-muted">(Optional)</small></label><input type="tel" class="form-control" name="alternate_number"></div>
+          </div>
+          <div class="modal-footer bg-light">
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Contact</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if contacts %}
+{% for contact in contacts %}
+<div class="modal fade" id="editContactModal{{ contact.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold">Edit Contact</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('edit_contact', id=contact.id) }}">
+          <div class="modal-body">
+              <div class="mb-3"><label class="form-label fw-bold">Name</label><input type="text" class="form-control" name="name" value="{{ contact.name }}" required></div>
+              <div class="mb-3">
+                  <label class="form-label fw-bold">Relation</label>
+                  <select class="form-select" name="relation" required>
+                      {% for r in ['Father','Mother','Wife','Husband','Son','Daughter','Brother','Sister','Friend','Caretaker','Other'] %}
+                      <option value="{{ r }}" {% if contact.relation == r %}selected{% endif %}>{{ r }}</option>
+                      {% endfor %}
+                  </select>
+              </div>
+              <div class="mb-3"><label class="form-label fw-bold">Phone</label><input type="tel" class="form-control" name="phone_number" value="{{ contact.phone_number }}" required></div>
+              <div class="mb-3"><label class="form-label fw-bold">Alternate <small class="text-muted">(Optional)</small></label><input type="tel" class="form-control" name="alternate_number" value="{{ contact.alternate_number or '' }}"></div>
+          </div>
+          <div class="modal-footer bg-light justify-content-between">
+              <button type="button" class="btn btn-danger" onclick="document.getElementById('deleteForm{{ contact.id }}').submit();"><i class="bi bi-trash"></i> Delete</button>
+              <div>
+                  <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+          </div>
+      </form>
+      <form id="deleteForm{{ contact.id }}" method="POST" action="{{ url_for('delete_contact', id=contact.id) }}" class="d-none"></form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<script>
+function confirmRemove(medId, medName) {
+    document.getElementById('removeTabletName').innerText = medName;
+    document.getElementById('removeTabletForm').action = '/medicine/' + medId + '/remove';
+    new bootstrap.Modal(document.getElementById('removeTabletModal')).show();
+}
+</script>
+{% endblock %}
