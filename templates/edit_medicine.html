@@ -70,6 +70,34 @@
                         </select>
                     </div>
                     
+
+
+                    <div class="row g-4 mb-4">
+                        <!-- Start Date -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">Start Date</label>
+                            <input type="date" class="form-control form-control-lg shadow-sm" name="start_date" value="{{ med.start_date if med.start_date else '' }}" style="border-radius: 10px;">
+                        </div>
+                        <!-- End Date -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">End Date</label>
+                            <input type="date" class="form-control form-control-lg shadow-sm" name="end_date" value="{{ med.end_date if med.end_date else '' }}" style="border-radius: 10px;">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-4 mb-4">
+                        <!-- Remaining Tablets -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">Remaining Tablets</label>
+                            <input type="number" min="1" class="form-control form-control-lg shadow-sm" name="remaining_tablets" value="{{ med.remaining_tablets if med.remaining_tablets else '' }}" placeholder="E.g. 30" style="border-radius: 10px;">
+                        </div>
+                        <!-- Notes -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark">Notes</label>
+                            <input type="text" class="form-control form-control-lg shadow-sm" name="notes" value="{{ med.notes if med.notes else '' }}" placeholder="Optional instructions" style="border-radius: 10px;">
+                        </div>
+                    </div>
+
                     <div class="d-grid mt-5">
                         <button type="submit" class="btn btn-primary btn-lg rounded-pill shadow-sm fw-bold">
                             <i class="bi bi-check2-circle me-2"></i> Save Changes

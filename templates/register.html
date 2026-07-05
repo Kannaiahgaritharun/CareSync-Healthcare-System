@@ -8,11 +8,15 @@
             <form method="POST" action="{{ url_for('register') }}">
                 <div class="mb-3">
                     <label class="form-label">Full Name</label>
-                    <input type="text" name="name" class="form-control" required placeholder="Enter your full name">
+                    <input type="text" name="name" class="form-control" required placeholder="Enter your full name" value="{{ form.name if form else '' }}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Email address</label>
-                    <input type="email" name="email" class="form-control" required placeholder="Enter your email">
+                    <input type="email" name="email" class="form-control" required placeholder="Enter your email" value="{{ form.email if form else '' }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Phone Number (For SMS/WhatsApp Reminders)</label>
+                    <input type="text" name="phone_number" class="form-control" required pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" placeholder="e.g. 9876543210" value="{{ form.phone_number if form else '' }}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Password</label>
@@ -21,13 +25,13 @@
                 <div class="mb-3">
                     <label class="form-label">Role</label>
                     <select name="role" class="form-select" id="roleSelect" required onchange="togglePatientEmail()">
-                        <option value="patient">Patient / User</option>
-                        <option value="family">Family Member</option>
+                        <option value="patient" {% if form and form.role == 'patient' %}selected{% endif %}>Patient / User</option>
+                        <option value="family" {% if form and form.role == 'family' %}selected{% endif %}>Family Member</option>
                     </select>
                 </div>
                 <div class="mb-4" id="patientEmailDiv" style="display: none;">
                     <label class="form-label">Patient's Email (To link account)</label>
-                    <input type="email" name="patient_email" id="patientEmailInput" class="form-control" placeholder="Enter patient's registered email">
+                    <input type="email" name="patient_email" id="patientEmailInput" class="form-control" placeholder="Enter patient's registered email" value="{{ form.patient_email if form else '' }}">
                     <small class="text-muted">The patient must register first before you can link as a family member.</small>
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Register</button>
@@ -48,5 +52,7 @@ function togglePatientEmail() {
         patientInput.required = false;
     }
 }
+// Run on load in case of form validation errors
+document.addEventListener('DOMContentLoaded', togglePatientEmail);
 </script>
 {% endblock %}

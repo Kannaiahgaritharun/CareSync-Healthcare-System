@@ -29,7 +29,7 @@
             <div class="d-flex align-items-center w-100 mb-1">
                 <div class="stat-icon icon-blue mb-0 me-3"><i class="bi bi-capsule"></i></div>
                 <div>
-                    <p class="stat-value mb-0">{{ medicines|length }}</p>
+                    <p class="stat-value mb-0" id="stat-total">{{ medicines|length }}</p>
                     <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Today Medicines</p>
                 </div>
             </div>
@@ -44,7 +44,7 @@
             <div class="d-flex align-items-center w-100 mb-1">
                 <div class="stat-icon icon-green mb-0 me-3"><i class="bi bi-check2-circle"></i></div>
                 <div>
-                    <p class="stat-value mb-0">{{ log_dict.values()|select("equalto","taken")|list|length }}</p>
+                    <p class="stat-value mb-0" id="stat-taken">{{ log_dict.values()|select("equalto","taken")|list|length }}</p>
                     <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Taken</p>
                 </div>
             </div>
@@ -59,7 +59,7 @@
             <div class="d-flex align-items-center w-100 mb-1">
                 <div class="stat-icon icon-orange mb-0 me-3"><i class="bi bi-clock"></i></div>
                 <div>
-                    <p class="stat-value mb-0">{{ pending_count }}</p>
+                    <p class="stat-value mb-0" id="stat-pending">{{ pending_count }}</p>
                     <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Pending</p>
                 </div>
             </div>
@@ -74,7 +74,7 @@
             <div class="d-flex align-items-center w-100 mb-1">
                 <div class="stat-icon icon-red mb-0 me-3"><i class="bi bi-x-circle"></i></div>
                 <div>
-                    <p class="stat-value mb-0">{{ log_dict.values()|select("equalto","missed")|list|length }}</p>
+                    <p class="stat-value mb-0" id="stat-missed">{{ log_dict.values()|select("equalto","missed")|list|length }}</p>
                     <p class="mb-0 fw-semibold text-dark" style="font-size:0.85rem;">Missed</p>
                 </div>
             </div>
@@ -144,16 +144,6 @@
                 </a>
             </div>
             <div class="col">
-                <a href="#contacts" class="quick-access-card bg-pastel-blue">
-                    <div style="width:44px;height:44px;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
-                        <i class="bi bi-telephone-fill text-white fs-5"></i>
-                    </div>
-                    <div class="qa-title">Call Family Contact</div>
-                    <div class="qa-desc">Quick call to your family contact</div>
-                    <div class="qa-btn text-pastel-blue"><i class="bi bi-arrow-right"></i></div>
-                </a>
-            </div>
-            <div class="col">
                 <a href="{{ url_for('emergency_dashboard') }}" class="quick-access-card bg-pastel-red">
                     <div style="width:44px;height:44px;background:#dc2626;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
                         <span class="text-white fw-bold" style="font-size:0.75rem;letter-spacing:0.5px;">SOS</span>
@@ -161,16 +151,6 @@
                     <div class="qa-title">SOS Help Now</div>
                     <div class="qa-desc">Get immediate emergency help</div>
                     <div class="qa-btn text-pastel-red"><i class="bi bi-arrow-right"></i></div>
-                </a>
-            </div>
-            <div class="col">
-                <a href="{{ url_for('reminders') }}" class="quick-access-card bg-pastel-teal">
-                    <div style="width:44px;height:44px;background:#0891b2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
-                        <i class="bi bi-droplet-fill text-white fs-5"></i>
-                    </div>
-                    <div class="qa-title">Water Reminder</div>
-                    <div class="qa-desc">Stay hydrated and healthy</div>
-                    <div class="qa-btn text-pastel-teal"><i class="bi bi-arrow-right"></i></div>
                 </a>
             </div>
         </div>
@@ -436,5 +416,22 @@ function confirmRemove(medId, medName) {
     document.getElementById('removeTabletForm').action = '/medicine/' + medId + '/remove';
     new bootstrap.Modal(document.getElementById('removeTabletModal')).show();
 }
+
+document.addEventListener('caresync:dashboard_update', function(e) {
+    const data = e.detail;
+    const statPending = document.getElementById('stat-pending');
+    
+    if(statPending && parseInt(statPending.textContent) > 0) {
+        statPending.textContent = parseInt(statPending.textContent) - 1;
+    }
+    
+    if (data.status === 'taken') {
+        const statTaken = document.getElementById('stat-taken');
+        if (statTaken) statTaken.textContent = parseInt(statTaken.textContent) + 1;
+    } else if (data.status === 'missed') {
+        const statMissed = document.getElementById('stat-missed');
+        if (statMissed) statMissed.textContent = parseInt(statMissed.textContent) + 1;
+    }
+});
 </script>
 {% endblock %}

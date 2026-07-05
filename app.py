@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify
+from flask_socketio import SocketIO, emit
 import sqlite3
 import os
 import logging
@@ -6,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
+from auth import login_required, role_required, api_login_required
 
 load_dotenv()
 
@@ -15,6 +17,7 @@ logger = logging.getLogger('caresync')
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'super_secret_health_key_2024')
+socketio = SocketIO(app, cors_allowed_origins="*")
 DATABASE = 'database.db'
 
 UPLOAD_FOLDER = 'static/uploads'
@@ -89,6 +92,11 @@ def init_db():
         
         try:
             cursor.execute("ALTER TABLE medicines ADD COLUMN status TEXT DEFAULT 'active'")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute('ALTER TABLE medicines ADD COLUMN remaining_tablets INTEGER')
         except sqlite3.OperationalError:
             pass
         
@@ -216,12 +224,25 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    import re
     if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        password = request.form['password']
-        role = request.form['role']
-        patient_email = request.form.get('patient_email', '')
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        phone_number = request.form.get('phone_number', '').strip()
+        role = request.form.get('role', 'patient')
+        patient_email = request.form.get('patient_email', '').strip()
+
+        # Input Validation
+        if phone_number and not re.match(r"^[6-9]\d{9}$", phone_number):
+            flash('Invalid phone number. Must be a valid 10-digit Indian mobile number.', 'danger')
+            return render_template('register.html', form=request.form)
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            flash('Invalid email format.', 'danger')
+            return render_template('register.html', form=request.form)
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long.', 'danger')
+            return render_template('register.html', form=request.form)
 
         db = get_db()
         cursor = db.cursor()
@@ -230,33 +251,33 @@ def register():
         user = cursor.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
         if user:
             flash('Email already registered!', 'danger')
-            return redirect(url_for('register'))
+            return render_template('register.html', form=request.form)
 
         patient_id = None
         if role == 'family':
             if not patient_email:
                 flash('Patient Email is required for Family role.', 'danger')
-                return redirect(url_for('register'))
+                return render_template('register.html', form=request.form)
             patient = cursor.execute('SELECT id FROM users WHERE email = ? AND role = "patient"', (patient_email,)).fetchone()
             if not patient:
                 flash('Patient not found with that email. Please ensure patient is registered first.', 'danger')
-                return redirect(url_for('register'))
+                return render_template('register.html', form=request.form)
             patient_id = patient['id']
 
         hashed_pw = generate_password_hash(password)
-        cursor.execute('INSERT INTO users (name, email, password, role, patient_id) VALUES (?, ?, ?, ?, ?)',
-                       (name, email, hashed_pw, role, patient_id))
+        cursor.execute('INSERT INTO users (name, email, password, role, patient_id, phone_number) VALUES (?, ?, ?, ?, ?, ?)',
+                       (name, email, hashed_pw, role, patient_id, phone_number))
         db.commit()
         flash('Registration successful! Please login.', 'success')
         return redirect(url_for('login'))
 
-    return render_template('register.html')
+    return render_template('register.html', form={})
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
         
         db = get_db()
         cursor = db.cursor()
@@ -275,9 +296,9 @@ def login():
                 return redirect(url_for('family_dashboard'))
         else:
             flash('Invalid email or password.', 'danger')
-            return redirect(url_for('login'))
+            return render_template('login.html', form={'email': email})
             
-    return render_template('login.html')
+    return render_template('login.html', form={})
 
 @app.route('/logout')
 def logout():
@@ -285,10 +306,8 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/patient_dashboard')
-def patient_dashboard():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-    
+@role_required('patient')
+def patient_dashboard():    
     db = get_db()
     cursor = db.cursor()
     medicines = cursor.execute('''
@@ -343,10 +362,8 @@ def patient_dashboard():
     return render_template('patient_dashboard.html', medicines=medicines, log_dict=log_dict, today=today, user=user, contacts=contacts, taken_count=taken_count, missed_count=missed_count, missed_details=missed_details, adherence_score=adherence_score, pending_count=pending_count)
 
 @app.route('/family_dashboard')
-def family_dashboard():
-    if 'user_id' not in session or session.get('role') != 'family':
-        return redirect(url_for('login'))
-        
+@role_required('family')
+def family_dashboard():        
     patient_id = session.get('patient_id')
     db = get_db()
     cursor = db.cursor()
@@ -368,10 +385,8 @@ def family_dashboard():
     return render_template('family_dashboard.html', patient=patient, medicines=medicines, logs=logs, alerts=alerts, today=today)
 
 @app.route('/add_medicine', methods=['GET', 'POST'])
-def add_medicine():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def add_medicine():        
     if request.method == 'POST':
         file = request.files.get('prescription_image')
         if file and file.filename != '':
@@ -395,10 +410,8 @@ def add_medicine():
     return render_template('add_medicine_step1.html')
 
 @app.route('/add_medicine_details', methods=['GET', 'POST'])
-def add_medicine_details():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def add_medicine_details():        
     db = get_db()
     cursor = db.cursor()
     
@@ -408,43 +421,59 @@ def add_medicine_details():
         prescription = cursor.execute('SELECT * FROM prescriptions WHERE id = ? AND user_id = ?', (prescription_id, session['user_id'])).fetchone()
 
     if request.method == 'POST':
-        name = request.form['medicine_name']
-        dosage = request.form['dosage']
-        time = request.form['time']
-        repeat_type = request.form['repeat_type']
+        name = request.form.get('medicine_name', '').strip()
+        dosage = request.form.get('dosage', '').strip()
+        time = request.form.get('time', '').strip()
+        repeat_type = request.form.get('repeat_type', 'daily')
         p_id = request.form.get('prescription_id')
-        if p_id == '':
-            p_id = None
+        p_id = None if not p_id else int(p_id)
             
-        food_instruction = request.form.get('food_instruction', '')
-        start_date = request.form.get('start_date', '')
-        end_date = request.form.get('end_date', '')
-        notes = request.form.get('notes', '')
+        food_instruction = request.form.get('food_instruction', '').strip()
+        start_date = request.form.get('start_date', '').strip()
+        end_date = request.form.get('end_date', '').strip()
+        notes = request.form.get('notes', '').strip()
+        remaining = request.form.get('remaining_tablets', '').strip()
+        remaining = int(remaining) if remaining else None
+        
+        # Validations
+        if not name or not dosage or not time:
+            flash('Name, Dosage, and Time are required.', 'danger')
+            return redirect(request.url)
+            
+        if start_date and end_date and start_date > end_date:
+            flash('End Date cannot be before Start Date.', 'danger')
+            return redirect(request.url)
+            
+        # Duplicate check
+        dup = cursor.execute('SELECT id FROM medicines WHERE user_id = ? AND medicine_name = ? AND time = ? AND status = "active"', (session['user_id'], name, time)).fetchone()
+        if dup:
+            flash('An active medicine with this name and time already exists.', 'warning')
+            return redirect(request.url)
         
         cursor.execute('''
             INSERT INTO medicines 
-            (user_id, medicine_name, dosage, time, repeat_type, prescription_id, food_instruction, start_date, end_date, notes) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (session['user_id'], name, dosage, time, repeat_type, p_id, food_instruction, start_date, end_date, notes))
+            (user_id, medicine_name, dosage, time, repeat_type, prescription_id, food_instruction, start_date, end_date, notes, remaining_tablets, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        ''', (session['user_id'], name, dosage, time, repeat_type, p_id, food_instruction, start_date, end_date, notes, remaining))
+        med_id = cursor.lastrowid
+        
+        cursor.execute('INSERT INTO history_logs (user_id, action_type, item_type, item_id, item_name, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                       (session['user_id'], 'added', 'medicine', med_id, name, f"Added to schedule. Dose: {dosage}", datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        
         db.commit()
         flash(f'Tablet "{name}" added successfully!', 'success')
         
         action = request.form.get('action')
         if action == 'add_another':
-            if p_id:
-                return redirect(url_for('add_medicine_details', prescription_id=p_id))
-            else:
-                return redirect(url_for('add_medicine_details'))
+            return redirect(url_for('add_medicine_details', prescription_id=p_id) if p_id else url_for('add_medicine_details'))
                 
         return redirect(url_for('patient_dashboard'))
         
     return render_template('add_medicine_details.html', prescription=prescription, prescription_id=prescription_id)
 
 @app.route('/delete_medicine/<int:id>', methods=['POST'])
-def delete_medicine(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-    
+@role_required('patient')
+def delete_medicine(id):    
     db = get_db()
     cursor = db.cursor()
     cursor.execute('DELETE FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id']))
@@ -453,36 +482,61 @@ def delete_medicine(id):
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/log_medicine/<int:id>/<status>', methods=['POST'])
-def log_medicine(id, status):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def log_medicine(id, status):        
     today = date.today().strftime('%Y-%m-%d')
     db = get_db()
     cursor = db.cursor()
     
-    # Check if already logged
-    existing = cursor.execute('SELECT id FROM logs WHERE medicine_id = ? AND date = ?', (id, today)).fetchone()
+    med = cursor.execute('SELECT * FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id'])).fetchone()
+    if not med:
+        return redirect(url_for('patient_dashboard'))
+    
+    existing = cursor.execute('SELECT id, status FROM logs WHERE medicine_id = ? AND date = ?', (id, today)).fetchone()
+    
     if existing:
         cursor.execute('UPDATE logs SET status = ? WHERE id = ?', (status, existing['id']))
+        # Adjust remaining tablets if changed from missed -> taken or taken -> missed
+        if existing['status'] != 'taken' and status == 'taken':
+            cursor.execute('UPDATE medicines SET remaining_tablets = remaining_tablets - 1 WHERE id = ? AND remaining_tablets IS NOT NULL AND remaining_tablets > 0', (id,))
+        elif existing['status'] == 'taken' and status != 'taken':
+            cursor.execute('UPDATE medicines SET remaining_tablets = remaining_tablets + 1 WHERE id = ? AND remaining_tablets IS NOT NULL', (id,))
     else:
         cursor.execute('INSERT INTO logs (medicine_id, date, status) VALUES (?, ?, ?)', (id, today, status))
+        if status == 'taken':
+            cursor.execute('UPDATE medicines SET remaining_tablets = remaining_tablets - 1 WHERE id = ? AND remaining_tablets IS NOT NULL AND remaining_tablets > 0', (id,))
     
-    # If missed, send alert
+    # Check if medicine is now completed
+    updated_med = cursor.execute('SELECT remaining_tablets, end_date FROM medicines WHERE id = ?', (id,)).fetchone()
+    is_completed = False
+    if updated_med['remaining_tablets'] == 0:
+        is_completed = True
+    elif updated_med['end_date'] and updated_med['end_date'] != '' and updated_med['end_date'] < today:
+        is_completed = True
+        
+    if is_completed:
+        cursor.execute("UPDATE medicines SET status = 'completed' WHERE id = ?", (id,))
+        cursor.execute('INSERT INTO history_logs (user_id, action_type, item_type, item_id, item_name, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                       (session['user_id'], 'completed', 'medicine', id, med['medicine_name'], "Course completed.", datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    
     if status == 'missed':
-        med = cursor.execute('SELECT medicine_name FROM medicines WHERE id = ?', (id,)).fetchone()
         message = f"Missed medicine: {med['medicine_name']} today."
-        cursor.execute('INSERT INTO alerts (user_id, type, message, created_at) VALUES (?, ?, ?, ?)',
-                       (session['user_id'], 'Missed Dose', message, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        cursor.execute('INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status) VALUES (?, ?, ?, ?, 0, ?, ?)',
+                       (session['user_id'], 'Missed Dose', message, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'in-app', 'sent'))
+
+    cursor.execute('INSERT INTO history_logs (user_id, action_type, item_type, item_id, item_name, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                   (session['user_id'], 'logged', 'medicine', id, med['medicine_name'], f"Marked as {status}", datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
     db.commit()
+    socketio.emit('dashboard_update', {'medicine_id': id, 'status': status}, to=str(session['user_id']))
+    if is_completed:
+        flash(f"Medicine '{med['medicine_name']}' course is completed!", "success")
+        
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/sos', methods=['POST'])
-def sos():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def sos():        
     db = get_db()
     cursor = db.cursor()
     
@@ -515,10 +569,8 @@ def sos():
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/add_contact', methods=['POST'])
-def add_contact():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def add_contact():        
     name = request.form['name']
     relation = request.form['relation']
     phone = request.form['phone_number']
@@ -530,13 +582,11 @@ def add_contact():
                    (session['user_id'], name, relation, phone, alternate))
     db.commit()
     flash(f'Emergency contact {name} added.', 'success')
-    return redirect(url_for('patient_dashboard'))
+    return redirect(url_for('emergency_dashboard'))
 
 @app.route('/edit_contact/<int:id>', methods=['POST'])
-def edit_contact(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def edit_contact(id):        
     name = request.form['name']
     relation = request.form['relation']
     phone = request.form['phone_number']
@@ -551,10 +601,8 @@ def edit_contact(id):
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/delete_contact/<int:id>', methods=['POST'])
-def delete_contact(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def delete_contact(id):        
     db = get_db()
     cursor = db.cursor()
     cursor.execute('DELETE FROM emergency_contacts WHERE id = ? AND user_id = ?', (id, session['user_id']))
@@ -563,10 +611,8 @@ def delete_contact(id):
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/reports')
-def reports():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def reports():        
     db = get_db()
     cursor = db.cursor()
     
@@ -589,10 +635,11 @@ def reports():
     
     # 1. Total Stats Today
     logs_today = cursor.execute('''
-        SELECT action_type, COUNT(*) as count 
-        FROM history_logs 
-        WHERE user_id = ? AND item_type = 'medicine' AND date(timestamp) = ?
-        GROUP BY action_type
+        SELECT l.status as action_type, COUNT(*) as count 
+        FROM logs l
+        JOIN medicines m ON l.medicine_id = m.id
+        WHERE m.user_id = ? AND l.date = ?
+        GROUP BY l.status
     ''', (target_id, today)).fetchall()
     
     today_stats = {'taken': 0, 'missed': 0, 'pending': 0}
@@ -606,11 +653,12 @@ def reports():
     
     # 2. Weekly Adherence Data (last 7 days)
     weekly_logs = cursor.execute('''
-        SELECT date(timestamp) as log_date, action_type, COUNT(*) as count
-        FROM history_logs
-        WHERE user_id = ? AND item_type = 'medicine' AND date(timestamp) >= ?
-        GROUP BY log_date, action_type
-        ORDER BY log_date ASC
+        SELECT l.date as log_date, l.status as action_type, COUNT(*) as count
+        FROM logs l
+        JOIN medicines m ON l.medicine_id = m.id
+        WHERE m.user_id = ? AND l.date >= ?
+        GROUP BY l.date, l.status
+        ORDER BY l.date ASC
     ''', (target_id, seven_days_ago)).fetchall()
     
     # Process weekly data into format for Chart.js
@@ -645,10 +693,8 @@ def reports():
                            adherence_pct=adherence_pct)
 
 @app.route('/delete_prescription/<int:id>', methods=['POST'])
-def delete_prescription(id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def delete_prescription(id):        
     db = get_db()
     cursor = db.cursor()
     
@@ -672,10 +718,8 @@ def delete_prescription(id):
     return redirect(url_for('reports'))
 
 @app.route('/medicine/<int:id>/move', methods=['POST'])
-def move_medicine(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def move_medicine(id):        
     db = get_db()
     cursor = db.cursor()
     med = cursor.execute('SELECT * FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id'])).fetchone()
@@ -688,10 +732,8 @@ def move_medicine(id):
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/medicine/<int:id>/remove', methods=['POST'])
-def remove_medicine(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def remove_medicine(id):        
     db = get_db()
     cursor = db.cursor()
     med = cursor.execute('SELECT * FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id'])).fetchone()
@@ -704,10 +746,8 @@ def remove_medicine(id):
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/history')
-def history():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def history():        
     db = get_db()
     cursor = db.cursor()
     
@@ -729,10 +769,8 @@ def history():
     return render_template('history.html', logs=logs, current_filter=filter_type)
 
 @app.route('/history/<int:id>/delete', methods=['POST'])
-def delete_history(id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def delete_history(id):        
     db = get_db()
     cursor = db.cursor()
     cursor.execute('DELETE FROM history_logs WHERE id = ? AND user_id = ?', (id, session['user_id']))
@@ -741,10 +779,8 @@ def delete_history(id):
     return redirect(url_for('history'))
 
 @app.route('/history/<int:id>/restore', methods=['POST'])
-def restore_history(id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def restore_history(id):        
     db = get_db()
     cursor = db.cursor()
     
@@ -761,16 +797,18 @@ def restore_history(id):
     return redirect(url_for('history'))
 
 @app.route('/settings', methods=['GET', 'POST'])
-def settings():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
+@login_required
+def settings():        
+    import re
     db = get_db()
     cursor = db.cursor()
     
     if request.method == 'POST':
         name = request.form.get('name')
         phone = request.form.get('phone_number')
+        if phone and not re.match(r"^[6-9]\d{9}$", phone):
+            flash('Invalid phone number. Must be a valid 10-digit Indian mobile number.', 'danger')
+            return redirect(url_for('settings'))
         age = request.form.get('age')
         if age == '':
             age = None
@@ -800,10 +838,8 @@ def settings():
     return render_template('settings.html', user=user)
 
 @app.route('/my_medicines')
-def my_medicines():
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def my_medicines():        
     db = get_db()
     cursor = db.cursor()
     medicines = cursor.execute('''
@@ -815,10 +851,8 @@ def my_medicines():
     return render_template('my_medicines.html', medicines=medicines)
 
 @app.route('/edit_medicine/<int:id>', methods=['GET', 'POST'])
-def edit_medicine(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def edit_medicine(id):        
     db = get_db()
     cursor = db.cursor()
     med = cursor.execute('SELECT * FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id'])).fetchone()
@@ -828,17 +862,35 @@ def edit_medicine(id):
         return redirect(url_for('my_medicines'))
 
     if request.method == 'POST':
-        name = request.form.get('medicine_name')
-        dosage = request.form.get('dosage')
-        time = request.form.get('time')
-        repeat = request.form.get('repeat_type', 'daily') # Fallback to daily
-        food = request.form.get('food_instruction')
+        name = request.form.get('medicine_name', '').strip()
+        dosage = request.form.get('dosage', '').strip()
+        time = request.form.get('time', '').strip()
+        repeat = request.form.get('repeat_type', 'daily')
+        food = request.form.get('food_instruction', '').strip()
+        start_date = request.form.get('start_date', '').strip()
+        end_date = request.form.get('end_date', '').strip()
+        notes = request.form.get('notes', '').strip()
+        remaining = request.form.get('remaining_tablets', '').strip()
+        remaining = int(remaining) if remaining else None
+        
+        if not name or not dosage or not time:
+            flash('Name, Dosage, and Time are required.', 'danger')
+            return redirect(request.url)
+            
+        if start_date and end_date and start_date > end_date:
+            flash('End Date cannot be before Start Date.', 'danger')
+            return redirect(request.url)
+            
+        dup = cursor.execute('SELECT id FROM medicines WHERE user_id = ? AND medicine_name = ? AND time = ? AND status = "active" AND id != ?', (session['user_id'], name, time, id)).fetchone()
+        if dup:
+            flash('Another active medicine with this name and time already exists.', 'warning')
+            return redirect(request.url)
         
         cursor.execute('''
             UPDATE medicines 
-            SET medicine_name = ?, dosage = ?, time = ?, repeat_type = ?, food_instruction = ?
+            SET medicine_name = ?, dosage = ?, time = ?, repeat_type = ?, food_instruction = ?, start_date = ?, end_date = ?, notes = ?, remaining_tablets = ?
             WHERE id = ? AND user_id = ?
-        ''', (name, dosage, time, repeat, food, id, session['user_id']))
+        ''', (name, dosage, time, repeat, food, start_date, end_date, notes, remaining, id, session['user_id']))
         
         cursor.execute('INSERT INTO history_logs (user_id, action_type, item_type, item_id, item_name, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
                        (session['user_id'], 'edited', 'medicine', id, name, f"Updated details. Dose: {dosage}", datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -849,10 +901,8 @@ def edit_medicine(id):
     return render_template('edit_medicine.html', med=med)
 
 @app.route('/snooze_medicine/<int:id>', methods=['POST'])
-def snooze_medicine(id):
-    if 'user_id' not in session or session.get('role') != 'patient':
-        return redirect(url_for('login'))
-        
+@role_required('patient')
+def snooze_medicine(id):        
     db = get_db()
     cursor = db.cursor()
     med = cursor.execute('SELECT * FROM medicines WHERE id = ? AND user_id = ?', (id, session['user_id'])).fetchone()
@@ -872,24 +922,24 @@ def snooze_medicine(id):
     return redirect(request.referrer or url_for('patient_dashboard'))
 
 @app.route('/reminders')
-def reminders():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
+@login_required
+def reminders():    
     db = get_db()
     cursor = db.cursor()
-    # Simple logic for now: show all medicines
+    # Filter for active medicines
     medicines = cursor.execute('''
         SELECT * FROM medicines WHERE user_id = ? AND status = 'active' ORDER BY time ASC
     ''', (session['user_id'],)).fetchall()
     
-    return render_template('reminders.html', medicines=medicines)
+    today = date.today().strftime('%Y-%m-%d')
+    logs = cursor.execute('SELECT medicine_id, status FROM logs WHERE date = ?', (today,)).fetchall()
+    log_dict = {log['medicine_id']: log['status'] for log in logs}
+    
+    return render_template('reminders.html', medicines=medicines, log_dict=log_dict)
 
 @app.route('/emergency_dashboard')
-def emergency_dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
+@login_required
+def emergency_dashboard():    
     db = get_db()
     cursor = db.cursor()
     contacts = cursor.execute('SELECT * FROM emergency_contacts WHERE user_id = ? ORDER BY id ASC', (session['user_id'],)).fetchall()
@@ -898,11 +948,9 @@ def emergency_dashboard():
 # ─── Notification API Endpoints ───────────────────────────────────────────
 
 @app.route('/api/notifications')
+@api_login_required
 def api_notifications():
-    """Return unread in-app alerts for the logged-in user (JSON)."""
-    if 'user_id' not in session:
-        return jsonify({'error': 'unauthorized'}), 401
-    
+    """Return unread in-app alerts for the logged-in user (JSON)."""    
     db = get_db()
     cursor = db.cursor()
     alerts = cursor.execute("""
@@ -934,11 +982,9 @@ def api_notifications():
 
 
 @app.route('/api/notifications/read/<int:alert_id>', methods=['POST'])
+@api_login_required
 def mark_notification_read(alert_id):
-    """Mark a specific notification as read."""
-    if 'user_id' not in session:
-        return jsonify({'error': 'unauthorized'}), 401
-    
+    """Mark a specific notification as read."""    
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
@@ -950,11 +996,9 @@ def mark_notification_read(alert_id):
 
 
 @app.route('/api/notifications/read_all', methods=['POST'])
+@api_login_required
 def mark_all_notifications_read():
-    """Mark all notifications as read."""
-    if 'user_id' not in session:
-        return jsonify({'error': 'unauthorized'}), 401
-    
+    """Mark all notifications as read."""    
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
@@ -966,11 +1010,9 @@ def mark_all_notifications_read():
 
 
 @app.route('/api/notifications/snooze/<int:alert_id>', methods=['POST'])
+@api_login_required
 def snooze_notification(alert_id):
-    """Mark a notification as read (snooze action)."""
-    if 'user_id' not in session:
-        return jsonify({'error': 'unauthorized'}), 401
-    
+    """Mark a notification as read (snooze action)."""    
     db = get_db()
     cursor = db.cursor()
     cursor.execute(
@@ -981,11 +1023,17 @@ def snooze_notification(alert_id):
     return jsonify({'success': True, 'snoozed': True})
 
 
+@socketio.on('connect')
+def handle_connect():
+    if 'user_id' in session:
+        from flask_socketio import join_room
+        join_room(str(session['user_id']))
+
 if __name__ == '__main__':
     init_db()
     # Start background scheduler (only in main process, not reloader child)
     import os
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
         from scheduler import start_scheduler
-        start_scheduler()
-    app.run(debug=True)
+        start_scheduler(socketio)
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)

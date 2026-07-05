@@ -14,13 +14,15 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from services.notifications import (
     send_sms, send_whatsapp, send_email,
-    build_reminder_sms, build_reminder_email_html
+    build_reminder_sms, build_reminder_email_html,
+    send_sos_alert
 )
 
 DATABASE = 'database.db'
 logger = logging.getLogger("caresync.scheduler")
 
 scheduler = None
+socketio_app = None
 
 
 def get_db():
@@ -28,6 +30,44 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+
+def notify_family(cursor, patient_id, title, message, now_str, socketio_app):
+    family = cursor.execute("SELECT id FROM users WHERE role = 'family' AND patient_id = ?", (patient_id,)).fetchall()
+    for fam in family:
+        cursor.execute("""
+            INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
+            VALUES (?, ?, ?, ?, 0, 'in-app', 'sent')
+        """, (fam['id'], title, message, now_str))
+        alert_id = cursor.lastrowid
+        if socketio_app:
+            socketio_app.emit('new_notification', {
+                'id': alert_id,
+                'type': title,
+                'message': message,
+                'created_at': now_str
+            }, to=str(fam['id']))
+
+def trigger_emergency_sos(conn, cursor, user_id, med_name, now_str, socketio_app):
+    logger.info(f"[Scheduler] Triggering Emergency SOS for user {user_id} (Missed: {med_name})")
+    results = send_sos_alert(user_id, db_conn=conn)
+    logger.info(f"[Scheduler] SOS delivery results for user {user_id}: {results}")
+    
+    sos_msg = f"EMERGENCY SOS: {med_name} was missed. Emergency contacts have been alerted."
+    cursor.execute("""
+        INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
+        VALUES (?, 'Emergency SOS', ?, ?, 0, 'in-app', 'sent')
+    """, (user_id, sos_msg, now_str))
+    alert_id = cursor.lastrowid
+    conn.commit()
+    
+    if socketio_app:
+        socketio_app.emit('new_notification', {
+            'id': alert_id,
+            'type': 'Emergency SOS',
+            'message': sos_msg,
+            'created_at': now_str
+        }, to=str(user_id))
 
 # ─── Job 1: Check medicines due in the last 5 minutes (every 60 s) ────────────
 def check_due_medicines():
@@ -43,19 +83,26 @@ def check_due_medicines():
     cursor = conn.cursor()
 
     try:
-        # Find active medicines due within the last 5-minute window
+        # Find active medicines for today, time check will be in Python to handle midnight rollover
         medicines = cursor.execute("""
             SELECT m.*, u.name AS user_name, u.email AS user_email,
                    u.phone_number AS user_phone
             FROM medicines m
             JOIN users u ON m.user_id = u.id
             WHERE m.status = 'active'
-              AND m.time >= ? AND m.time <= ?
-              AND (m.start_date IS NULL OR m.start_date <= ?)
-              AND (m.end_date   IS NULL OR m.end_date   >= ?)
-        """, (window_start, current_time, today, today)).fetchall()
+              AND (m.start_date IS NULL OR m.start_date = '' OR m.start_date <= ?)
+              AND (m.end_date   IS NULL OR m.end_date   = '' OR m.end_date   >= ?)
+        """, (today, today)).fetchall()
 
         for med in medicines:
+            med_dt_today = datetime.strptime(f"{now.strftime('%Y-%m-%d')} {med['time']}", '%Y-%m-%d %H:%M')
+            if now - timedelta(minutes=5) <= med_dt_today <= now:
+                pass
+            elif now - timedelta(minutes=5) <= med_dt_today - timedelta(days=1) <= now:
+                pass
+            else:
+                continue
+
             med_id  = med['id']
             user_id = med['user_id']
 
@@ -87,14 +134,24 @@ def check_due_medicines():
 
             sms_result   = send_sms(user_phone, sms_msg)       if user_phone else {"success": False}
             wa_result    = send_whatsapp(user_phone, sms_msg)  if user_phone else {"success": False}
-            email_result = send_email(user_email, f"💊 Time to take {med_name} – CareSync Reminder", email_html)
+            email_result = send_email(user_email, f"Time to take {med_name} - CareSync Reminder", email_html)
 
             # ── In-app alert ────────────────────────────────────────────
-            in_app_msg = f"⏰ Time to take {med_name} {dosage} now ({time_str}). {food_inst}".strip()
+            in_app_msg = f" Time to take {med_name} {dosage} now ({time_str}). {food_inst}".strip()
             cursor.execute("""
                 INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
                 VALUES (?, 'Medicine Reminder', ?, ?, 0, 'in-app', 'sent')
             """, (user_id, in_app_msg, now_str))
+            alert_id = cursor.lastrowid
+            
+            if socketio_app:
+                socketio_app.emit('new_notification', {
+                    'id': alert_id,
+                    'type': 'Medicine Reminder',
+                    'message': in_app_msg,
+                    'created_at': now_str
+                }, to=str(user_id))
+            notify_family(cursor, user_id, 'Patient Medicine Reminder', f"Reminder sent to {user_name} to take {med_name} {dosage}.", now_str, socketio_app)
 
             # ── Log notification attempt ────────────────────────────────
             cursor.execute("""
@@ -189,19 +246,34 @@ def check_repeat_reminders():
                     "INSERT INTO logs (medicine_id, date, status) VALUES (?, ?, 'missed')",
                     (med_id, today)
                 )
-                miss_msg = (f"❌ {med_name} {dosage} marked as MISSED. "
+                miss_msg = (f" {med_name} {dosage} marked as MISSED. "
                             f"Scheduled for {time_str} — no action taken for 60 min.")
                 cursor.execute("""
                     INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
                     VALUES (?, 'Missed Dose', ?, ?, 0, 'in-app', 'sent')
                 """, (user_id, miss_msg, now_str))
+                alert_id = cursor.lastrowid
+                
                 # Mark all notification_log rows for this medicine as closed
                 cursor.execute("""
                     UPDATE notification_logs SET attempt_num = 3
                     WHERE medicine_id = ? AND date = ?
                 """, (med_id, today))
                 conn.commit()
+                
+                if socketio_app:
+                    socketio_app.emit('new_notification', {
+                        'id': alert_id,
+                        'type': 'Missed Dose',
+                        'message': miss_msg,
+                        'created_at': now_str
+                    }, to=str(user_id))
+                    socketio_app.emit('dashboard_update', {'medicine_id': med_id, 'status': 'missed'}, to=str(user_id))
+                    socketio_app.emit('status_update', {'medicine_id': med_id, 'status': 'missed'}, to=str(user_id))
+                
+                notify_family(cursor, user_id, 'Missed Dose Alert', miss_msg, now_str, socketio_app)
                 logger.info(f"[Scheduler] Auto-missed '{med_name}' (user {user_id}) after 60 min")
+                trigger_emergency_sos(conn, cursor, user_id, med_name, now_str, socketio_app)
                 continue
 
             # ── Decide next repeat attempt ──────────────────────────────
@@ -222,17 +294,27 @@ def check_repeat_reminders():
             wa_result    = send_whatsapp(user_phone, sms_msg) if user_phone else {"success": False}
             email_result = send_email(
                 user_email,
-                f"⚠️ Reminder #{next_attempt+1}: Take {med_name} – CareSync",
+                f" Reminder #{next_attempt+1}: Take {med_name} – CareSync",
                 email_html
             )
 
-            label      = "⚠️ Follow-up" if next_attempt == 1 else "🚨 Final"
+            label      = " Follow-up" if next_attempt == 1 else " Final"
             in_app_msg = (f"{label} Reminder: Still time to take {med_name} {dosage}. "
                           f"Scheduled {time_str}.")
             cursor.execute("""
                 INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
                 VALUES (?, 'Repeat Reminder', ?, ?, 0, 'in-app', 'sent')
             """, (user_id, in_app_msg, now_str))
+            alert_id = cursor.lastrowid
+            
+            if socketio_app:
+                socketio_app.emit('new_notification', {
+                    'id': alert_id,
+                    'type': 'Repeat Reminder',
+                    'message': in_app_msg,
+                    'created_at': now_str
+                }, to=str(user_id))
+            notify_family(cursor, user_id, 'Patient Missed Reminder', f"{user_name} still hasn't taken {med_name}. Follow-up reminder sent.", now_str, socketio_app)
 
             cursor.execute("""
                 INSERT INTO notification_logs
@@ -248,24 +330,30 @@ def check_repeat_reminders():
 
         # ── Part B: Medicines past due >60 min with NO notification sent ──
         # Catches cases where the scheduler was down during the reminder window
-        overdue_threshold = (now - timedelta(minutes=60)).strftime('%H:%M')
-
-        overdue_meds = cursor.execute("""
+        overdue_meds_raw = cursor.execute("""
             SELECT m.*, u.name AS user_name, u.email AS user_email,
                    u.phone_number AS user_phone
             FROM medicines m
             JOIN users u ON m.user_id = u.id
             WHERE m.status = 'active'
-              AND m.time <= ?
-              AND (m.start_date IS NULL OR m.start_date <= ?)
-              AND (m.end_date   IS NULL OR m.end_date   >= ?)
+              AND (m.start_date IS NULL OR m.start_date = '' OR m.start_date <= ?)
+              AND (m.end_date   IS NULL OR m.end_date   = '' OR m.end_date   >= ?)
               AND NOT EXISTS (
                   SELECT 1 FROM logs WHERE medicine_id = m.id AND date = ?
               )
               AND NOT EXISTS (
                   SELECT 1 FROM notification_logs WHERE medicine_id = m.id AND date = ?
               )
-        """, (overdue_threshold, today, today, today, today)).fetchall()
+        """, (today, today, today, today)).fetchall()
+
+        overdue_meds = []
+        for m in overdue_meds_raw:
+            med_dt = datetime.strptime(f"{now.strftime('%Y-%m-%d')} {m['time']}", '%Y-%m-%d %H:%M')
+            if (now - med_dt).total_seconds() >= 3600:
+                overdue_meds.append(m)
+            elif (now - (med_dt - timedelta(days=1))).total_seconds() >= 3600 and (now - (med_dt - timedelta(days=1))).total_seconds() < 86400:
+                overdue_meds.append(m)
+
 
         for med in overdue_meds:
             med_id  = med['id']
@@ -276,12 +364,14 @@ def check_repeat_reminders():
                 "INSERT INTO logs (medicine_id, date, status) VALUES (?, ?, 'missed')",
                 (med_id, today)
             )
-            miss_msg = (f"❌ {med['medicine_name']} {med['dosage']} marked as MISSED. "
+            miss_msg = (f" {med['medicine_name']} {med['dosage']} marked as MISSED. "
                         f"Was scheduled for {med['time']} — no reminder could be delivered.")
             cursor.execute("""
                 INSERT INTO alerts (user_id, type, message, created_at, is_read, channel, delivery_status)
                 VALUES (?, 'Missed Dose', ?, ?, 0, 'in-app', 'sent')
             """, (user_id, miss_msg, now_str))
+            alert_id = cursor.lastrowid
+            
             # Insert a sentinel notification_log row so we don't process it again
             cursor.execute("""
                 INSERT INTO notification_logs
@@ -289,7 +379,20 @@ def check_repeat_reminders():
                 VALUES (?, ?, ?, 3, ?, 'not_sent', 'not_sent', 'not_sent')
             """, (med_id, user_id, today, now_str))
             conn.commit()
+            
+            if socketio_app:
+                socketio_app.emit('new_notification', {
+                    'id': alert_id,
+                    'type': 'Missed Dose',
+                    'message': miss_msg,
+                    'created_at': now_str
+                }, to=str(user_id))
+                socketio_app.emit('dashboard_update', {'medicine_id': med_id, 'status': 'missed'}, to=str(user_id))
+                socketio_app.emit('status_update', {'medicine_id': med_id, 'status': 'missed'}, to=str(user_id))
+                
+            notify_family(cursor, user_id, 'Missed Dose Alert', miss_msg, now_str, socketio_app)
             logger.info(f"[Scheduler] Auto-missed (no prior notification) '{med['medicine_name']}' (user {user_id})")
+            trigger_emergency_sos(conn, cursor, user_id, med['medicine_name'], now_str, socketio_app)
 
     except Exception as e:
         logger.error(f"[Scheduler] Error in check_repeat_reminders: {e}")
@@ -298,8 +401,9 @@ def check_repeat_reminders():
 
 
 # ─── Scheduler lifecycle ───────────────────────────────────────────────────────
-def start_scheduler():
-    global scheduler
+def start_scheduler(socketio_instance=None):
+    global scheduler, socketio_app
+    socketio_app = socketio_instance
     if scheduler and scheduler.running:
         return
 

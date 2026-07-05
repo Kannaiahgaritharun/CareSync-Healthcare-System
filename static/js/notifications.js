@@ -1,20 +1,8 @@
-/**
- * CareSync Real-Time Notification System
- * - Requests browser notification permission on load
- * - Polls /api/notifications every 30 seconds
- * - On first poll, seeds knownIds so existing alerts are NOT re-toasted
- * - Shows browser push + in-app toasts only for genuinely NEW alerts
- * - Handles mark as read, snooze, mark all read
- */
-
 const CareNotifications = (() => {
-  // ── State ─────────────────────────────────────────────────────────
-  let knownIds     = new Set();
-  let pollInterval = null;
-  let unreadCount  = 0;
-  let isFirstPoll  = true;   // prevents toasting pre-existing alerts on load
+  let knownIds = new Set();
+  let unreadCount = 0;
+  let socket = null;
 
-  // ── Browser Permission ─────────────────────────────────────────────
   function requestBrowserPermission() {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'default') {
@@ -40,7 +28,13 @@ const CareNotifications = (() => {
     };
   }
 
-  // ── In-App Toast ───────────────────────────────────────────────────
+  function playSound() {
+    const audio = document.getElementById('notification-sound');
+    if (audio) {
+      audio.play().catch(e => console.log('Audio play blocked:', e));
+    }
+  }
+
   function showToast(message, type = 'info', notifId = null, notifType = '') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -84,7 +78,6 @@ const CareNotifications = (() => {
       max-width: 360px;
       animation: slideInRight 0.4s ease;
       position: relative;
-      cursor: pointer;
     `;
     toast.innerHTML = `
       <span style="font-size:22px;flex-shrink:0;">${icon}</span>
@@ -97,10 +90,6 @@ const CareNotifications = (() => {
             style="background:${color};color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;font-weight:600;">
             Mark Read ✓
           </button>
-          <button onclick="CareNotifications.snoozeAlert(${notifId});this.closest('.cs-toast').remove();"
-            style="background:#f0f0f0;color:#666;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;">
-            Snooze 💤
-          </button>
         </div>` : ''}
       </div>
       <button onclick="this.closest('.cs-toast').remove();"
@@ -108,17 +97,10 @@ const CareNotifications = (() => {
     `;
 
     container.appendChild(toast);
-
-    // Auto-remove after 15 seconds
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.style.animation = 'slideOutRight 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
-      }
-    }, 15000);
+    
+    // Auto-remove is intentionally omitted so notifications persist until acted upon
   }
 
-  // ── Badge Update ───────────────────────────────────────────────────
   function updateBadge(count) {
     unreadCount = count;
     const badge   = document.getElementById('notif-badge');
@@ -129,7 +111,6 @@ const CareNotifications = (() => {
     }
     if (countEl) countEl.textContent = count > 0 ? `${count} unread` : 'All caught up!';
 
-    // Update document title
     if (count > 0) {
       document.title = `(${count}) ${document.title.replace(/^\(\d+\) /, '')}`;
     } else {
@@ -137,7 +118,6 @@ const CareNotifications = (() => {
     }
   }
 
-  // ── Notification List in Dropdown ──────────────────────────────────
   function renderNotificationList(notifications) {
     const list = document.getElementById('notif-list');
     if (!list) return;
@@ -176,74 +156,68 @@ const CareNotifications = (() => {
     }).join('');
   }
 
-  // ── Poll Server ────────────────────────────────────────────────────
-  async function poll() {
+  async function fetchInitial() {
     try {
       const res = await fetch('/api/notifications', { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = await res.json();
-
       updateBadge(data.unread_count);
       renderNotificationList(data.notifications);
-
-      if (isFirstPoll) {
-        // Seed knownIds with ALL existing IDs so none of them get toasted on load.
-        // The badge + list above already inform the user about unread count.
-        data.notifications.forEach(n => knownIds.add(n.id));
-        isFirstPoll = false;
-      } else {
-        // Only toast alerts that genuinely arrived since the last poll
-        const newAlerts = data.notifications.filter(n => !n.is_read && !knownIds.has(n.id));
-        newAlerts.forEach(n => {
-          knownIds.add(n.id);
-          showBrowserNotification(`CareSync: ${n.type}`, n.message, n.id);
-          showToast(n.message, 'info', n.id, n.type);
-        });
-      }
-    } catch (e) {
-      // Silently ignore poll errors (server might be restarting)
-    }
+      data.notifications.forEach(n => knownIds.add(n.id));
+    } catch (e) {}
   }
 
-  // ── Public API ─────────────────────────────────────────────────────
   async function markRead(alertId) {
     try {
       await fetch(`/api/notifications/read/${alertId}`, { method: 'POST', credentials: 'same-origin' });
       knownIds.add(alertId);
-      await poll();
+      await fetchInitial();
     } catch (e) {}
   }
 
   async function markAllRead() {
     try {
       await fetch('/api/notifications/read_all', { method: 'POST', credentials: 'same-origin' });
-      await poll();
+      await fetchInitial();
       showToast('All notifications marked as read', 'success');
     } catch (e) {}
   }
 
-  async function snoozeAlert(alertId) {
-    try {
-      await fetch(`/api/notifications/snooze/${alertId}`, { method: 'POST', credentials: 'same-origin' });
-      showToast('Reminder snoozed 💤', 'info');
-      await poll();
-    } catch (e) {}
-  }
-
-  // ── Toggle Panel ───────────────────────────────────────────────────
   function togglePanel() {
     const panel = document.getElementById('notif-panel');
     if (!panel) return;
     const isOpen = panel.style.display === 'block';
     panel.style.display = isOpen ? 'none' : 'block';
-    if (!isOpen) poll(); // Refresh when opening
+    if (!isOpen) fetchInitial();
   }
 
-  // ── Init ───────────────────────────────────────────────────────────
+  function initSocket() {
+    if (typeof io !== 'undefined') {
+        socket = io();
+        socket.on('new_notification', (data) => {
+            if (!knownIds.has(data.id)) {
+                knownIds.add(data.id);
+                playSound();
+                showBrowserNotification(`CareSync: ${data.type}`, data.message, data.id);
+                showToast(data.message, 'info', data.id, data.type);
+                fetchInitial();
+            }
+        });
+        
+        socket.on('dashboard_update', (data) => {
+            document.dispatchEvent(new CustomEvent('caresync:dashboard_update', { detail: data }));
+        });
+        
+        socket.on('status_update', (data) => {
+            document.dispatchEvent(new CustomEvent('caresync:status_update', { detail: data }));
+        });
+    }
+  }
+
   function init() {
     requestBrowserPermission();
-    poll(); // Immediate first poll (seeds knownIds, no toasts)
-    pollInterval = setInterval(poll, 30000); // Every 30 s
+    fetchInitial();
+    initSocket();
 
     // Close panel on outside click
     document.addEventListener('click', (e) => {
@@ -255,12 +229,11 @@ const CareNotifications = (() => {
     });
   }
 
-  // Auto-init when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  return { markRead, markAllRead, snoozeAlert, togglePanel, poll };
+  return { markRead, markAllRead, togglePanel };
 })();

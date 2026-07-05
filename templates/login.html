@@ -8,7 +8,7 @@
             <form method="POST" action="{{ url_for('login') }}">
                 <div class="mb-3">
                     <label class="form-label">Email address</label>
-                    <input type="email" name="email" class="form-control" required placeholder="Enter your email">
+                    <input type="email" name="email" class="form-control" required placeholder="Enter your email" value="{{ form.email if form else '' }}">
                 </div>
                 <div class="mb-4">
                     <label class="form-label">Password</label>

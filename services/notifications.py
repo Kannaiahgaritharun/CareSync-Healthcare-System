@@ -158,14 +158,14 @@ def build_reminder_email_html(user_name: str, medicine_name: str, dosage: str,
                                food_instruction: str, time_str: str, repeat_num: int = 0) -> str:
     repeat_banner = ""
     if repeat_num == 1:
-        repeat_banner = '<div style="background:#fff3cd;padding:10px;border-radius:8px;margin-bottom:16px;"><b>⚠️ This is a follow-up reminder (10 minutes overdue)</b></div>'
+        repeat_banner = '<div style="background:#fff3cd;padding:10px;border-radius:8px;margin-bottom:16px;"><b> This is a follow-up reminder (10 minutes overdue)</b></div>'
     elif repeat_num >= 2:
-        repeat_banner = '<div style="background:#f8d7da;padding:10px;border-radius:8px;margin-bottom:16px;"><b>🚨 FINAL REMINDER — Medicine is 30 minutes overdue!</b></div>'
+        repeat_banner = '<div style="background:#f8d7da;padding:10px;border-radius:8px;margin-bottom:16px;"><b> FINAL REMINDER — Medicine is 30 minutes overdue!</b></div>'
 
     return f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;background:#f8f9fa;padding:24px;border-radius:12px;">
       <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:20px;border-radius:10px;text-align:center;margin-bottom:24px;">
-        <h1 style="color:#fff;margin:0;font-size:24px;">💊 CareSync</h1>
+        <h1 style="color:#fff;margin:0;font-size:24px;"> CareSync</h1>
         <p style="color:rgba(255,255,255,0.85);margin:4px 0 0 0;">Medicine Reminder</p>
       </div>
       {repeat_banner}
@@ -173,14 +173,14 @@ def build_reminder_email_html(user_name: str, medicine_name: str, dosage: str,
       <p style="color:#555;">This is your scheduled reminder to take your medicine.</p>
       <div style="background:#fff;border:2px solid #667eea;border-radius:10px;padding:20px;margin:20px 0;">
         <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px;color:#888;width:40%;">💊 Medicine</td><td style="padding:8px;font-weight:bold;color:#333;">{medicine_name}</td></tr>
-          <tr style="background:#f8f9fa;"><td style="padding:8px;color:#888;">📏 Dosage</td><td style="padding:8px;font-weight:bold;color:#333;">{dosage}</td></tr>
-          <tr><td style="padding:8px;color:#888;">⏰ Time</td><td style="padding:8px;font-weight:bold;color:#667eea;">{time_str}</td></tr>
-          <tr style="background:#f8f9fa;"><td style="padding:8px;color:#888;">🍽️ Instruction</td><td style="padding:8px;color:#333;">{food_instruction or 'As prescribed'}</td></tr>
+          <tr><td style="padding:8px;color:#888;width:40%;"> Medicine</td><td style="padding:8px;font-weight:bold;color:#333;">{medicine_name}</td></tr>
+          <tr style="background:#f8f9fa;"><td style="padding:8px;color:#888;"> Dosage</td><td style="padding:8px;font-weight:bold;color:#333;">{dosage}</td></tr>
+          <tr><td style="padding:8px;color:#888;"> Time</td><td style="padding:8px;font-weight:bold;color:#667eea;">{time_str}</td></tr>
+          <tr style="background:#f8f9fa;"><td style="padding:8px;color:#888;"> Instruction</td><td style="padding:8px;color:#333;">{food_instruction or 'As prescribed'}</td></tr>
         </table>
       </div>
       <div style="text-align:center;margin:24px 0;">
-        <a href="http://127.0.0.1:5000/patient_dashboard" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 32px;border-radius:25px;text-decoration:none;font-weight:bold;font-size:16px;">Mark as Taken ✓</a>
+        <a href="http://127.0.0.1:5000/patient_dashboard" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 32px;border-radius:25px;text-decoration:none;font-weight:bold;font-size:16px;">Mark as Taken </a>
       </div>
       <p style="color:#999;font-size:12px;text-align:center;">CareSync Health Platform • Your Health, Our Priority</p>
     </div>
@@ -188,25 +188,25 @@ def build_reminder_email_html(user_name: str, medicine_name: str, dosage: str,
 
 
 def build_sos_message(user_name: str, location_link: str = None) -> str:
-    loc = f"\n📍 Location: {location_link}" if location_link else ""
-    return f"🚨 EMERGENCY SOS from CareSync!\n\n{user_name} needs immediate help.{loc}\n\nPlease contact them immediately or call emergency services."
+    loc = f"\n Location: {location_link}" if location_link else ""
+    return f" EMERGENCY SOS from CareSync!\n\n{user_name} needs immediate help.{loc}\n\nPlease contact them immediately or call emergency services."
 
 
 def build_sos_email_html(user_name: str, user_email: str, user_phone: str, location_link: str = None) -> str:
-    loc_row = f'<tr><td style="padding:8px;color:#888;">📍 Location</td><td style="padding:8px;"><a href="{location_link}">{location_link}</a></td></tr>' if location_link else ""
+    loc_row = f'<tr><td style="padding:8px;color:#888;"> Location</td><td style="padding:8px;"><a href="{location_link}">{location_link}</a></td></tr>' if location_link else ""
     return f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;background:#fff5f5;padding:24px;border-radius:12px;border:2px solid #dc3545;">
       <div style="background:#dc3545;padding:20px;border-radius:10px;text-align:center;margin-bottom:24px;">
-        <h1 style="color:#fff;margin:0;font-size:28px;">🚨 EMERGENCY SOS</h1>
+        <h1 style="color:#fff;margin:0;font-size:28px;"> EMERGENCY SOS</h1>
         <p style="color:rgba(255,255,255,0.9);margin:4px 0 0 0;">CareSync Health Platform</p>
       </div>
       <p style="color:#333;font-size:18px;font-weight:bold;">Immediate assistance required!</p>
       <p style="color:#555;">{user_name} has triggered an Emergency SOS alert and may need immediate help.</p>
       <div style="background:#fff;border:1px solid #dc3545;border-radius:10px;padding:20px;margin:20px 0;">
         <table style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px;color:#888;">👤 Name</td><td style="padding:8px;font-weight:bold;color:#333;">{user_name}</td></tr>
-          <tr style="background:#fff5f5;"><td style="padding:8px;color:#888;">📧 Email</td><td style="padding:8px;">{user_email}</td></tr>
-          <tr><td style="padding:8px;color:#888;">📞 Phone</td><td style="padding:8px;">{user_phone or 'Not provided'}</td></tr>
+          <tr><td style="padding:8px;color:#888;"> Name</td><td style="padding:8px;font-weight:bold;color:#333;">{user_name}</td></tr>
+          <tr style="background:#fff5f5;"><td style="padding:8px;color:#888;"> Email</td><td style="padding:8px;">{user_email}</td></tr>
+          <tr><td style="padding:8px;color:#888;"> Phone</td><td style="padding:8px;">{user_phone or 'Not provided'}</td></tr>
           {loc_row}
         </table>
       </div>
@@ -254,7 +254,7 @@ def send_sos_alert(user_id: int, location_link: str = None, db_conn=None) -> lis
         results.append({"contact": contact["name"], "channel": "whatsapp", **r2})
 
     # Also email the patient themselves as confirmation
-    r3 = send_email(user_email, "🚨 SOS Alert Dispatched – CareSync", email_html)
+    r3 = send_email(user_email, " SOS Alert Dispatched – CareSync", email_html)
     results.append({"contact": user_name, "channel": "email", **r3})
 
     logger.info(f"SOS dispatched for user {user_id}: {len(results)} messages sent")

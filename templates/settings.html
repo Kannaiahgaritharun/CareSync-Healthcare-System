@@ -23,7 +23,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="phone_number" class="form-label fw-bold text-dark small text-uppercase">Emergency Phone Number</label>
-                                <input type="text" class="form-control bg-light border-0" id="phone_number" name="phone_number" value="{{ user.phone_number or '' }}" placeholder="Enter phone number" style="padding: 12px 15px; border-radius: 10px;">
+                                <input type="text" class="form-control bg-light border-0" id="phone_number" name="phone_number" value="{{ user.phone_number or '' }}" placeholder="e.g. 9876543210" pattern="^[6-9]\d{9}$" title="Must be a valid 10-digit Indian mobile number" required style="padding: 12px 15px; border-radius: 10px;">
                             </div>
                         </div>
                         <div class="col-md-6">

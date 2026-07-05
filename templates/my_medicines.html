@@ -10,8 +10,18 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-12">
+<ul class="nav nav-pills mb-4" id="medicineTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active rounded-pill px-4" id="active-tab" data-bs-toggle="pill" data-bs-target="#active" type="button" role="tab">Active Medicines</button>
+    </li>
+    <li class="nav-item ms-2" role="presentation">
+        <button class="nav-link rounded-pill px-4" id="archived-tab" data-bs-toggle="pill" data-bs-target="#archived" type="button" role="tab">Old & Archived</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="medicineTabsContent">
+    <!-- Active Medicines Tab -->
+    <div class="tab-pane fade show active" id="active" role="tabpanel">
         <div class="card border-0 shadow-sm" style="border-radius: 15px;">
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -21,14 +31,14 @@
                                 <th class="border-0 px-4 py-3 text-muted text-uppercase" style="font-size: 0.85rem; border-top-left-radius: 15px;">Medicine Name</th>
                                 <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Dosage</th>
                                 <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Time</th>
-                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Repeat</th>
-                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Status</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Remaining</th>
                                 <th class="border-0 py-3 px-4 text-muted text-uppercase text-end" style="font-size: 0.85rem; border-top-right-radius: 15px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% if medicines %}
-                                {% for med in medicines %}
+                            {% set active_meds = medicines|selectattr("status", "equalto", "active")|list %}
+                            {% if active_meds %}
+                                {% for med in active_meds %}
                                 <tr>
                                     <td class="px-4 py-3">
                                         <div class="d-flex align-items-center">
@@ -44,19 +54,21 @@
                                         </div>
                                     </td>
                                     <td class="py-3">{{ med.dosage }}</td>
-                                    <td class="py-3 fw-bold text-dark"><i class="bi bi-clock me-1 text-muted"></i>{{ med.time }}</td>
-                                    <td class="py-3 text-capitalize">{{ med.repeat_type }}</td>
+                                    <td class="py-3 fw-bold text-dark"><i class="bi bi-clock me-1 text-muted"></i>{{ med.time }} <small class="text-muted fw-normal">({{ med.repeat_type }})</small></td>
                                     <td class="py-3">
-                                        {% if med.status == 'active' %}
-                                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2">Active</span>
-                                        {% elif med.status == 'archived' %}
-                                            <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-2">Archived</span>
+                                        {% if med.remaining_tablets is not none %}
+                                            <span class="badge bg-info bg-opacity-10 text-info rounded-pill px-3 py-2">{{ med.remaining_tablets }} Left</span>
                                         {% else %}
-                                            <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-2">{{ med.status|capitalize }}</span>
+                                            <span class="text-muted small">-</span>
                                         {% endif %}
                                     </td>
                                     <td class="px-4 py-3 text-end">
-                                        <a href="{{ url_for('edit_medicine', id=med.id) }}" class="btn btn-sm btn-light text-primary me-2 rounded-circle" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" title="Edit">
+                                        <form method="POST" action="{{ url_for('move_medicine', id=med.id) }}" class="d-inline" title="Archive">
+                                            <button type="submit" class="btn btn-sm btn-light text-warning rounded-circle me-1" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-archive-fill"></i>
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('edit_medicine', id=med.id) }}" class="btn btn-sm btn-light text-primary me-1 rounded-circle" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" title="Edit">
                                             <i class="bi bi-pencil-fill"></i>
                                         </a>
                                         <form method="POST" action="{{ url_for('delete_medicine', id=med.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this medicine completely?');">
@@ -69,11 +81,67 @@
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="6" class="text-center py-5">
+                                    <td colspan="5" class="text-center py-5">
                                         <i class="bi bi-capsule text-muted opacity-50 mb-3 d-block" style="font-size: 3rem;"></i>
-                                        <h5 class="fw-bold text-muted">No medicines added yet</h5>
+                                        <h5 class="fw-bold text-muted">No active medicines</h5>
                                         <p class="text-muted small mb-4">Click the button above to add your first medication.</p>
                                         <a href="{{ url_for('add_medicine') }}" class="btn btn-outline-primary rounded-pill px-4">Add Medicine</a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archived Medicines Tab -->
+    <div class="tab-pane fade" id="archived" role="tabpanel">
+        <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="border-0 px-4 py-3 text-muted text-uppercase" style="font-size: 0.85rem; border-top-left-radius: 15px;">Medicine Name</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Dosage</th>
+                                <th class="border-0 py-3 text-muted text-uppercase" style="font-size: 0.85rem;">Status</th>
+                                <th class="border-0 py-3 px-4 text-muted text-uppercase text-end" style="font-size: 0.85rem; border-top-right-radius: 15px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set archived_meds = medicines|selectattr("status", "ne", "active")|list %}
+                            {% if archived_meds %}
+                                {% for med in archived_meds %}
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="d-flex align-items-center opacity-75">
+                                            <div class="stat-icon bg-secondary bg-opacity-10 text-secondary me-3" style="width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-archive-fill fs-5"></i>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0 fw-bold text-decoration-line-through text-muted">{{ med.medicine_name }}</h6>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 text-muted">{{ med.dosage }}</td>
+                                    <td class="py-3">
+                                        <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-2">{{ med.status|capitalize }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-end">
+                                        <form method="POST" action="{{ url_for('delete_medicine', id=med.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this permanently?');">
+                                            <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" title="Delete">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-5">
+                                        <h5 class="fw-bold text-muted">No archived medicines</h5>
                                     </td>
                                 </tr>
                             {% endif %}
