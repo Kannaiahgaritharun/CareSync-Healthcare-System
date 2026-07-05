@@ -17,7 +17,7 @@ logger = logging.getLogger('caresync')
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'super_secret_health_key_2024')
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 import os
 DATABASE = '/tmp/database.db' if os.environ.get('VERCEL') else 'database.db'
 
