@@ -1,4 +1,5 @@
 # CareSync - Healthcare System
+# Live Demo:https://care-sync-healthcare-system.vercel.app/
 
 CareSync is a comprehensive health platform designed to help patients manage their medication schedules while keeping their family members and primary caregivers in the loop. The platform offers multi-channel reminders, real-time in-app notifications, advanced adherence reporting, and a robust Emergency SOS system.
 
@@ -89,8 +90,7 @@ MOCK_MODE=true  # Set to false to send real SMS/WhatsApp/Emails
    ```
    *Note: The background scheduler (APScheduler) and WebSockets will initialize automatically on startup.*
 
-2. **Access the Application:**
-   Open your web browser and navigate to: [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
 
 ## 📸 Screenshots
 
