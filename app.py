@@ -1031,9 +1031,10 @@ def handle_connect():
 
 if __name__ == '__main__':
     init_db()
-    # Start background scheduler (only in main process, not reloader child)
     import os
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
         from scheduler import start_scheduler
         start_scheduler(socketio)
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+    
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port)
