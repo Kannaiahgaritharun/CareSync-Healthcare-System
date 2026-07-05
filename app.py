@@ -18,7 +18,8 @@ logger = logging.getLogger('caresync')
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'super_secret_health_key_2024')
 socketio = SocketIO(app, cors_allowed_origins="*")
-DATABASE = 'database.db'
+import os
+DATABASE = '/tmp/database.db' if os.environ.get('VERCEL') else 'database.db'
 
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -1037,4 +1038,4 @@ if __name__ == '__main__':
         start_scheduler(socketio)
     
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)

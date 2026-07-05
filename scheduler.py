@@ -18,7 +18,8 @@ from services.notifications import (
     send_sos_alert
 )
 
-DATABASE = 'database.db'
+import os
+DATABASE = '/tmp/database.db' if os.environ.get('VERCEL') else 'database.db'
 logger = logging.getLogger("caresync.scheduler")
 
 scheduler = None
