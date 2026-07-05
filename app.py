@@ -17,20 +17,13 @@ logger = logging.getLogger('caresync')
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'super_secret_health_key_2024')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
-import os
-DATABASE = '/tmp/database.db' if os.environ.get('VERCEL') else 'database.db'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-    return db
+from db_adapter import get_db, init_db
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -38,181 +31,9 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
-def init_db():
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL,
-                patient_id INTEGER,
-                phone_number TEXT,
-                prescription_image TEXT,
-                age INTEGER
-            )
-        ''')
-        
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN phone_number TEXT')
-        except sqlite3.OperationalError:
-            pass # Column likely exists
-            
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN prescription_image TEXT')
-        except sqlite3.OperationalError:
-            pass # Column likely exists
-            
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN age INTEGER')
-        except sqlite3.OperationalError:
-            pass # Column likely exists
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS medicines (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                medicine_name TEXT NOT NULL,
-                dosage TEXT NOT NULL,
-                time TEXT NOT NULL,
-                repeat_type TEXT NOT NULL,
-                prescription_id INTEGER,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                FOREIGN KEY (prescription_id) REFERENCES prescriptions (id)
-            )
-        ''')
-        
-        for col in ['food_instruction', 'start_date', 'end_date', 'notes']:
-            try:
-                cursor.execute(f'ALTER TABLE medicines ADD COLUMN {col} TEXT')
-            except sqlite3.OperationalError:
-                pass
-        
-        try:
-            cursor.execute("ALTER TABLE medicines ADD COLUMN status TEXT DEFAULT 'active'")
-        except sqlite3.OperationalError:
-            pass
-        
-        try:
-            cursor.execute('ALTER TABLE medicines ADD COLUMN remaining_tablets INTEGER')
-        except sqlite3.OperationalError:
-            pass
-        
-        try:
-            cursor.execute('ALTER TABLE medicines ADD COLUMN prescription_id INTEGER')
-        except sqlite3.OperationalError:
-            pass # Column likely exists
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS prescriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                image_path TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        try:
-            cursor.execute('ALTER TABLE prescriptions ADD COLUMN doctor_name TEXT')
-        except sqlite3.OperationalError:
-            pass
-            
-        try:
-            cursor.execute('ALTER TABLE prescriptions ADD COLUMN hospital_name TEXT')
-        except sqlite3.OperationalError:
-            pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                medicine_id INTEGER NOT NULL,
-                date TEXT NOT NULL,
-                status TEXT NOT NULL,
-                FOREIGN KEY (medicine_id) REFERENCES medicines (id)
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                type TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                is_read INTEGER DEFAULT 0,
-                channel TEXT DEFAULT 'in-app',
-                delivery_status TEXT DEFAULT 'sent',
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-
-        # Migrate alerts table if needed
-        for col, definition in [
-            ('is_read', 'INTEGER DEFAULT 0'),
-            ('channel', "TEXT DEFAULT 'in-app'"),
-            ('delivery_status', "TEXT DEFAULT 'sent'")
-        ]:
-            try:
-                cursor.execute(f'ALTER TABLE alerts ADD COLUMN {col} {definition}')
-            except sqlite3.OperationalError:
-                pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS emergency_contacts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                relation TEXT NOT NULL,
-                phone_number TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        try:
-            cursor.execute('ALTER TABLE emergency_contacts ADD COLUMN alternate_number TEXT')
-        except sqlite3.OperationalError:
-            pass
-            
-        try:
-            cursor.execute('ALTER TABLE emergency_contacts ADD COLUMN priority_order INTEGER DEFAULT 0')
-        except sqlite3.OperationalError:
-            pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS history_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                action_type TEXT NOT NULL,
-                item_type TEXT NOT NULL,
-                item_id INTEGER,
-                item_name TEXT NOT NULL,
-                details TEXT,
-                timestamp TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-
-        # Notification tracking table (for repeat reminder logic)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS notification_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                medicine_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                date TEXT NOT NULL,
-                attempt_num INTEGER DEFAULT 0,
-                sent_at TEXT NOT NULL,
-                sms_status TEXT DEFAULT 'not_sent',
-                whatsapp_status TEXT DEFAULT 'not_sent',
-                email_status TEXT DEFAULT 'not_sent',
-                FOREIGN KEY (medicine_id) REFERENCES medicines (id),
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-
-        db.commit()
+# Initialize database on startup
+with app.app_context():
+    init_db()
 
 @app.route('/')
 def index():
@@ -1030,12 +851,14 @@ def handle_connect():
         from flask_socketio import join_room
         join_room(str(session['user_id']))
 
+import os
+
+# Ensure the scheduler starts when imported by Gunicorn
+# Using Werkzeug's reloader or running under Gunicorn
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug or 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '').lower():
+    from scheduler import start_scheduler
+    start_scheduler(socketio)
+
 if __name__ == '__main__':
-    init_db()
-    import os
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
-        from scheduler import start_scheduler
-        start_scheduler(socketio)
-    
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)

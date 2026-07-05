@@ -6,7 +6,6 @@ Runs APScheduler in the background to:
   - Auto-mark as missed after 60 minutes (even if no reminder was ever sent)
 """
 
-import sqlite3
 import logging
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -18,18 +17,12 @@ from services.notifications import (
     send_sos_alert
 )
 
-import os
-DATABASE = '/tmp/database.db' if os.environ.get('VERCEL') else 'database.db'
+from db_adapter import get_db
+
 logger = logging.getLogger("caresync.scheduler")
 
 scheduler = None
 socketio_app = None
-
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 
