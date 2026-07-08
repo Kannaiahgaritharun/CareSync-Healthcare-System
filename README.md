@@ -92,9 +92,7 @@ MOCK_MODE=true  # Set to false to send real SMS/WhatsApp/Emails
 
 
 
-## 📸 Screenshots
 
-*(Add screenshots of the Patient Dashboard, Family Dashboard, Reports, and Emergency Center here)*
 
 ## 🔮 Future Improvements
 
